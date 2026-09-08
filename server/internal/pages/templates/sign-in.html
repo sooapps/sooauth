@@ -1,0 +1,29 @@
+{{define "sign-in-content"}}
+<section class="card">
+  <h1>Sign in</h1>
+  <p class="card-sub">Welcome back. Continue with a provider or email.</p>
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  {{if .Message}}<p class="message">{{.Message}}</p>{{end}}
+  {{if .SocialProviders}}
+  <div class="social">
+    {{range .SocialProviders}}
+    <a class="btn secondary social-{{.}}" href="/auth/social/{{.}}/start?return_to={{$.ReturnTo}}{{if $.TenantID}}&amp;tenant_id={{$.TenantID}}{{end}}{{if $.ClientID}}&amp;client_id={{$.ClientID}}{{end}}">{{providerLabel .}}</a>
+    {{end}}
+  </div>
+  <div class="divider">or email</div>
+  {{end}}
+  <form id="sign-in-form" class="stack">
+    <label>Email<input name="email" type="email" autocomplete="username" required /></label>
+    <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+    <button type="submit">Sign in</button>
+  </form>
+  <div class="links">
+    <a href="/auth/sign-up">Create account</a>
+    <a href="/auth/forgot-password">Forgot password</a>
+  </div>
+  <div class="passkey">
+    <button type="button" id="passkey-sign-in" class="btn ghost">Sign in with passkey</button>
+    <p class="passkey-hint">Optional — biometrics on a device where you registered a passkey.</p>
+  </div>
+</section>
+{{end}}

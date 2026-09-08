@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * Minimalism & Swiss Style — full light + dark
+ * Palette: deep navy / canvas / soft sage / lime-yellow accent.
+ * 0px base radius, hairline borders, flat surfaces, no gradients.
+ * ------------------------------------------------------------------ */
+
+:root {
+  color-scheme: light;
+
+  --color-bg: #ffffff;
+  --color-bg-subtle: #F5F5F5;
+  --color-fg: #051B23;
+  --color-fg-muted: #5D6B70;
+  --color-line: #C4C4C4;
+  --color-line-strong: #051B23;
+
+  --color-accent: #E8FF3F;
+  --color-accent-hover: #BAE02D;
+  --color-accent-fg: #051B23;
+
+  --color-beige: #E3EFD7;
+  --color-taupe: #C4C4C4;
+  --color-grey: #5D6B70;
+
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+    --color-bg: #0E0F11;
+    --color-bg-subtle: #1C1D1F;
+    --color-fg: #F5F6F6;
+    --color-fg-muted: #9D9E9F;
+    --color-line: #353537;
+    --color-line-strong: #F5F6F6;
+
+    --color-accent: #E8FF3F;
+    --color-accent-hover: #BAE02D;
+    --color-accent-fg: #0B0B0C;
+
+  --shadow-card: none;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: #ffffff;
+   --color-bg-subtle: #F5F5F5;
+   --color-fg: #051B23;
+   --color-fg-muted: #5D6B70;
+   --color-line: #C4C4C4;
+   --color-line-strong: #051B23;
+
+   --color-accent: #E8FF3F;
+   --color-accent-hover: #BAE02D;
+   --color-accent-fg: #051B23;
+
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-logo-image {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.brand-logo-dark { display: none; }
+:root[data-theme="dark"] .brand-logo-light { display: none; }
+:root[data-theme="dark"] .brand-logo-dark { display: block; }
+
+@theme {
+  --color-bg: var(--color-bg);
+  --color-bg-subtle: var(--color-bg-subtle);
+  --color-fg: var(--color-fg);
+  --color-fg-muted: var(--color-fg-muted);
+  --color-line: var(--color-line);
+  --color-line-strong: var(--color-line-strong);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-fg: var(--color-accent-fg);
+  --color-beige: var(--color-beige);
+  --color-taupe: var(--color-taupe);
+  --color-grey: var(--color-grey);
+
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+
+  --font-sans: var(--font-ibm-sans), "IBM Plex Sans", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace,
+    monospace;
+  --font-wordmark: var(--font-syne), var(--font-ibm-sans), ui-sans-serif,
+    sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-fg);
+    color: var(--color-bg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-fg);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+/* Container: 1280px, 1.5rem side padding */
+@utility container-swiss {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1280px;
+  padding-inline: 1.5rem;
+}
+
+/* Whisper shadow — cards only, light mode only */
+@utility shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+/* Entry animation: fade + translateY(16px -> 0), 420ms ease-out, 80ms stagger */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.42s ease-out both;
+}
+.rise-1 {
+  animation-delay: 0s;
+}
+.rise-2 {
+  animation-delay: 0.08s;
+}
+.rise-3 {
+  animation-delay: 0.16s;
+}
+.rise-4 {
+  animation-delay: 0.24s;
+}
+.rise-5 {
+  animation-delay: 0.32s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .rise-1,
+  .rise-2,
+  .rise-3,
+  .rise-4,
+  .rise-5 {
+    animation: none;
+  }
+}

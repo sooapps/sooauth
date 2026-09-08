@@ -1,0 +1,25 @@
+{
+  "name": "sooauth",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Self-hostable OIDC auth — docker run → working auth in minutes.",
+  "packageManager": "pnpm@10.18.2",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "dev": "docker compose up -d && cd server && go run ./cmd/sooauth",
+    "dev:infra": "docker compose up -d",
+    "dev:server": "cd server && go run ./cmd/sooauth",
+    "build:admin": "pnpm --filter @sooauth/admin build",
+    "build:web": "pnpm --filter @sooauth/web build",
+    "cf:build": "pnpm --filter @sooauth/web cf:build",
+    "cf:deploy": "pnpm --filter @sooauth/web cf:deploy",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.2"
+  }
+}

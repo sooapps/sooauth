@@ -1,0 +1,14 @@
+.env
+.env.local
+*.log
+node_modules/
+dist/
+.next/
+.open-next/
+.server/
+coverage/
+.DS_Store
+server/sooauth
+server/bin/
+*.test
+.vite/

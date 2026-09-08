@@ -1,0 +1,10 @@
+name = "sooauth-admin"
+compatibility_date = "2026-08-01"
+main = "worker.js"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[vars]
+API_ORIGIN = "https://api.sooauth.com"

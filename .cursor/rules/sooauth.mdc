@@ -1,0 +1,37 @@
+---
+description: How to implement authentication and user sessions using Sooauth OIDC
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.py", "**/*.go"]
+---
+
+# Sooauth Integration Rule
+
+You are an expert developer implementing authentication using **Sooauth**, an open-source, developer-owned OIDC authentication platform.
+
+## Key Rules
+- NEVER create database tables or Prisma/Drizzle schemas for users, sessions, or passwords when Sooauth is used. Authentication and credential storage are handled entirely by Sooauth.
+- Favor standard OIDC protocols and `@sooauth/sdk-js` or standard JOSE JWKS verification.
+- Always use environment variables for `SOOAUTH_ISSUER`, `SOOAUTH_CLIENT_ID`, and `SOOAUTH_REDIRECT_URI`.
+
+## Frontend Integration Pattern (Next.js / Vite / React)
+```typescript
+import { createSooauthClient } from "@sooauth/sdk-js";
+
+export const sooauth = createSooauthClient({
+  issuer: process.env.NEXT_PUBLIC_SOOAUTH_ISSUER || "https://auth.sooauth.com",
+  clientId: process.env.NEXT_PUBLIC_SOOAUTH_CLIENT_ID!,
+  redirectUri: process.env.NEXT_PUBLIC_SOOAUTH_REDIRECT_URI || "http://localhost:3000/callback",
+});
+```
+
+## Backend Token Verification Pattern
+```typescript
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+const issuer = process.env.SOOAUTH_ISSUER || "https://auth.sooauth.com";
+const JWKS = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
+
+export async function authenticateRequest(token: string) {
+  const { payload } = await jwtVerify(token, JWKS, { issuer });
+  return payload; // { sub, email, ... }
+}
+```

@@ -1,0 +1,139 @@
+{{define "account-content"}}
+<section class="card account-card">
+  <h1>Security Center</h1>
+  <p class="card-sub">Manage your sign-in sessions, passkeys, MFA, and password.</p>
+  <p id="account-status" class="message" hidden></p>
+  <p id="account-error" class="error" hidden></p>
+
+  <details class="account-section" open>
+    <summary>Sessions</summary>
+    <div id="account-sessions" class="account-list">Loading sessions...</div>
+    <button id="revoke-all-sessions" type="button" class="btn secondary">Revoke all sessions</button>
+  </details>
+
+  <details class="account-section">
+    <summary>Passkeys</summary>
+    <div id="account-passkeys" class="account-list">Loading passkeys...</div>
+  </details>
+
+  <details class="account-section" open>
+    <summary>Connected accounts</summary>
+    <p>Use a connected Google or GitHub account to sign in to your platform account.</p>
+    <div id="account-identities" class="account-list">Loading connected accounts...</div>
+    <div class="identity-actions"><a class="btn secondary" href="/auth/account/identities/google/link">Connect Google</a><a class="btn secondary" href="/auth/account/identities/github/link">Connect GitHub</a></div>
+  </details>
+
+  <details class="account-section">
+    <summary>Multi-factor authentication</summary>
+    <p id="account-mfa">Loading MFA status...</p>
+    <div id="account-mfa-setup" hidden>
+    <p>Scan this QR code with your authenticator app, or enter the secret manually. The secret stays on this server and is shown only to you.</p>
+    <img id="account-mfa-qr" width="256" height="256" alt="MFA setup QR code" />
+    <p><strong>Secret:</strong> <code id="account-mfa-secret"></code></p>
+    <form id="account-mfa-confirm-form" class="stack">
+      <label>Confirmation code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required /></label>
+      <button type="submit">Enable MFA</button>
+    </form>
+    </div>
+    <div id="account-mfa-backup" hidden>
+    <p><strong>Save these one-time backup codes.</strong> They will not be shown again.</p>
+    <pre id="account-mfa-backup-codes"></pre>
+    </div>
+    <form id="account-mfa-disable-form" class="stack" hidden>
+    <label>Authenticator code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required /></label>
+    <button type="submit" class="btn secondary">Disable MFA</button>
+    </form>
+  </details>
+
+  <details class="account-section">
+    <summary>Change password</summary>
+    <form id="account-password-form" class="stack">
+    <label>Current password<input name="current_password" type="password" autocomplete="current-password" required /></label>
+    <label>New password<input name="new_password" type="password" autocomplete="new-password" minlength="8" required /></label>
+    <button type="submit">Change password</button>
+    </form>
+  </details>
+</section>
+<script>
+(() => {
+  const status = document.querySelector('#account-status');
+  const error = document.querySelector('#account-error');
+  const csrf = () => document.cookie.split('; ').find(v => v.startsWith('sooauth_csrf='))?.split('=')[1] || '';
+  const escapeHTML = value => String(value).replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
+  const request = async (url, options = {}) => {
+    options.headers = {'Content-Type': 'application/json', 'X-CSRF-Token': csrf(), ...(options.headers || {})};
+    const response = await fetch(url, options);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || 'Request failed');
+    return body;
+  };
+  const show = (message, failed = false) => { (failed ? error : status).textContent = message; (failed ? error : status).hidden = false; };
+  const load = async () => {
+    try {
+      const sessions = await request('/auth/account/sessions');
+       const sessionRows = sessions.sessions || [];
+       document.querySelector('#account-sessions').innerHTML = sessionRows.length ? sessionRows.map(s => `<div class="account-row"><span><strong>${s.current ? 'This device' : 'Session'}</strong><br><small>${escapeHTML(s.user_agent || 'Unknown device')} · ${escapeHTML(s.ip || 'Unknown IP')}</small></span><button type="button" data-revoke="${s.id}" class="btn secondary">Revoke</button></div>`).join('') : 'No active sessions.';
+      document.querySelectorAll('[data-revoke]').forEach(button => button.onclick = async () => { try { await request('/auth/account/sessions/' + button.dataset.revoke, {method: 'DELETE'}); show('Session revoked.'); load(); } catch (e) { show(e.message, true); } });
+      const passkeys = await request('/auth/account/passkeys');
+       const passkeyRows = passkeys.passkeys || [];
+       document.querySelector('#account-passkeys').innerHTML = passkeyRows.length ? passkeyRows.map(p => `<div class="account-row"><span>Passkey<br><small>Added ${new Date(p.created_at).toLocaleString()}</small></span><button type="button" data-passkey="${p.id}" class="btn secondary">Delete</button></div>`).join('') : 'No passkeys registered.';
+      document.querySelectorAll('[data-passkey]').forEach(button => button.onclick = async () => { try { await request('/auth/account/passkeys/' + button.dataset.passkey, {method: 'DELETE'}); show('Passkey deleted.'); load(); } catch (e) { show(e.message, true); } });
+       let identities = {identities: []};
+       try { identities = await request('/auth/account/identities'); } catch (_) { /* A missing optional identity table should not block the security center. */ }
+       const identityRows = identities.identities || [];
+       document.querySelector('#account-identities').innerHTML = identityRows.length ? identityRows.map(i => `<div class="account-row"><span><strong>${escapeHTML(i.provider)}</strong><br><small>${escapeHTML(i.email || 'Connected account')}</small></span><button type="button" data-identity="${i.id}" class="btn secondary">Disconnect</button></div>`).join('') : 'No connected accounts.';
+      document.querySelectorAll('[data-identity]').forEach(button => button.onclick = async () => { if (!confirm('Disconnect this account?')) return; try { await request('/auth/account/identities/' + button.dataset.identity, {method: 'DELETE'}); show('Connected account disconnected.'); load(); } catch (e) { show(e.message === 'last_credential' ? 'Keep another sign-in method before disconnecting this account.' : e.message, true); } });
+       await loadMFA();
+     } catch (e) { show(e.message, true); }
+   };
+  const mfaStatus = document.querySelector('#account-mfa');
+  const setup = document.querySelector('#account-mfa-setup');
+  const backup = document.querySelector('#account-mfa-backup');
+  const disable = document.querySelector('#account-mfa-disable-form');
+  const loadMFA = async () => {
+    const mfa = await request('/auth/account/mfa');
+    mfaStatus.innerHTML = mfa.enabled ? 'Enabled' : '<button type="button" id="start-mfa">Set up MFA</button>';
+    setup.hidden = true;
+    backup.hidden = true;
+    disable.hidden = !mfa.enabled;
+    if (!mfa.enabled) document.querySelector('#start-mfa').onclick = startMFA;
+  };
+  const startMFA = async () => {
+    try {
+      const result = await request('/auth/mfa/start', {method: 'POST'});
+      const secret = result.Secret || result.secret;
+      setup.hidden = false;
+      document.querySelector('#account-mfa-secret').textContent = secret;
+      document.querySelector('#account-mfa-qr').src = '/auth/account/mfa/qr?' + Date.now();
+      document.querySelector('#account-mfa-confirm-form input').focus();
+    } catch (e) { show(e.message, true); }
+  };
+  document.querySelector('#account-mfa-confirm-form').onsubmit = async event => {
+    event.preventDefault();
+    try {
+      const result = await request('/auth/mfa/confirm', {method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.target)))});
+      setup.hidden = true;
+      backup.hidden = false;
+      document.querySelector('#account-mfa-backup-codes').textContent = result.backup_codes.join('\n');
+      event.target.reset();
+      await loadMFA();
+      backup.hidden = false;
+      show('MFA enabled. Store your backup codes securely.');
+    } catch (e) { show(e.message, true); }
+  };
+  disable.onsubmit = async event => {
+    event.preventDefault();
+    if (!confirm('Disable multi-factor authentication?')) return;
+    try {
+      await request('/auth/mfa/disable', {method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.target)))});
+      event.target.reset();
+      await loadMFA();
+      show('MFA disabled.');
+    } catch (e) { show(e.message, true); }
+  };
+  document.querySelector('#revoke-all-sessions').onclick = async () => { if (!confirm('Revoke every session, including this one?')) return; try { await request('/auth/account/sessions', {method: 'DELETE'}); show('All sessions revoked. Sign in again to continue.'); } catch (e) { show(e.message, true); } };
+  document.querySelector('#account-password-form').onsubmit = async event => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target)); try { await request('/auth/account/password', {method: 'PUT', body: JSON.stringify(data)}); show('Password changed. Sign in again to continue.'); event.target.reset(); } catch (e) { show(e.message, true); } };
+  load();
+})();
+</script>
+{{end}}

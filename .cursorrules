@@ -1,0 +1,41 @@
+# Sooauth AI Guidelines for Cursor
+
+When implementing authentication or identity flows in applications using Sooauth:
+
+## General Principles
+1. **Zero Database Migrations:** Do not generate custom database models or schema migrations (Prisma, Drizzle, TypeORM, SQLAlchemy) for auth. Sooauth manages authentication state, passwords, social credentials, and passkeys externally.
+2. **Standard OIDC First:** Always use standard OpenID Connect endpoints (`/oauth/authorize`, `/oauth/token`, `/.well-known/openid-configuration`, `/.well-known/jwks.json`).
+3. **Environment Configuration:**
+   - Always declare:
+     - `SOOAUTH_ISSUER` (defaults to `https://auth.sooauth.com` or custom self-hosted URL).
+     - `SOOAUTH_CLIENT_ID` (project client ID).
+     - `SOOAUTH_REDIRECT_URI` (the local or production callback path, e.g., `/callback` or `/api/auth/callback`).
+
+## Client Integration Examples
+
+### React / Next.js (App Router)
+```typescript
+import { createSooauthClient } from "@sooauth/sdk-js";
+
+export const auth = createSooauthClient({
+  issuer: process.env.NEXT_PUBLIC_SOOAUTH_ISSUER || "https://auth.sooauth.com",
+  clientId: process.env.NEXT_PUBLIC_SOOAUTH_CLIENT_ID!,
+  redirectUri: process.env.NEXT_PUBLIC_SOOAUTH_REDIRECT_URI!,
+});
+```
+
+### Backend Route Guard (JWT / JWKS via jose)
+```typescript
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+const issuer = process.env.SOOAUTH_ISSUER || "https://auth.sooauth.com";
+const JWKS = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
+
+export async function verifyAuth(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) throw new Error("Unauthorized");
+  const token = authHeader.substring(7);
+  const { payload } = await jwtVerify(token, JWKS, { issuer });
+  return payload;
+}
+```

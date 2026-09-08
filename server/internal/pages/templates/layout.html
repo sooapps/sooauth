@@ -1,0 +1,37 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{.Title}} · {{.BrandName}}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Syne:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --tenant-accent: {{.AccentColor}}; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; min-height: 100dvh; background: #FFFFFF; color: #051B23; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+    .auth-shell { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 20px; }
+    .wordmark { font-family: "Syne", sans-serif; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.03em; color: #051B23; text-decoration: none; margin-bottom: 24px; }
+  </style>
+   <link rel="stylesheet" href="/auth/static/style.css?v=7" />
+</head>
+<body>
+  <div class="auth-shell">
+    {{if ne .Title "Security Center"}}<a class="wordmark" href="https://sooauth.com">{{.BrandName}}</a>{{end}}
+    {{.Body}}
+    {{if ne .Title "Security Center"}}<footer class="auth-foot">
+      <a href="/dashboard/">Dashboard</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://sooauth.com/docs">Docs</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt">AI prompt</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://sooapps.com" target="_blank" rel="noopener">A Sooapps product ↗</a>
+    </footer>{{end}}
+  </div>
+  <script src="/auth/static/app.js?v=7"></script>
+</body>
+</html>
+{{end}}

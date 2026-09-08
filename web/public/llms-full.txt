@@ -1,0 +1,205 @@
+# Sooauth — Complete Developer & AI Agent Integration Reference
+
+## 1. Overview & Positioning
+
+Sooauth is an open-source, developer-owned authentication system with standard OpenID Connect (OIDC), passkeys (WebAuthn), social login (Google & GitHub), and hosted authentication pages.
+
+### Key Advantages:
+- **Zero Database Homework:** Unlike Better Auth or NextAuth/Auth.js with Prisma/Drizzle adapters, Sooauth does not require you to create or maintain user tables, account tables, or schema migrations in your application database.
+- **No Vendor Lock-In & No MAU Surprises:** Unlike Clerk or Auth0, Sooauth uses 100% standard OIDC. You own your data. You can switch between cloud (`https://auth.sooauth.com`) and your own self-hosted Docker instance with a single environment variable (`SOOAUTH_ISSUER`).
+- **Lean Footprint:** Built in Go. Runs in a lightweight single binary or small container with Postgres + Redis, compared to Keycloak's high-memory Java stack.
+
+---
+
+## 2. Standard Configuration
+
+### Required Client Environment Variables
+```env
+# URL of the Sooauth instance (hosted or self-hosted)
+SOOAUTH_ISSUER=https://auth.sooauth.com
+
+# Client ID created in Sooauth Admin -> Integration
+SOOAUTH_CLIENT_ID=your_client_id
+
+# Exact redirect URI registered in Sooauth Admin
+SOOAUTH_REDIRECT_URI=http://localhost:3000/callback
+```
+
+---
+
+## 3. OIDC Protocol Endpoints
+
+All endpoints follow standard OpenID Connect specifications:
+
+- **Discovery:** `GET {SOOAUTH_ISSUER}/.well-known/openid-configuration`
+- **JWKS (Public Keys):** `GET {SOOAUTH_ISSUER}/.well-known/jwks.json`
+- **Authorization:** `GET {SOOAUTH_ISSUER}/oauth/authorize`
+  - Query parameters:
+    - `client_id` (string, required)
+    - `redirect_uri` (string, required)
+    - `response_type=code` (required)
+    - `scope=openid profile email` (required)
+    - `code_challenge` (string, required for PKCE)
+    - `code_challenge_method=S256` (required for PKCE)
+    - `state` (string, optional CSRF protection)
+- **Token Exchange:** `POST {SOOAUTH_ISSUER}/oauth/token`
+  - Content-Type: `application/x-www-form-urlencoded`
+  - Parameters:
+    - `grant_type=authorization_code`
+    - `code={authorization_code}`
+    - `redirect_uri={redirect_uri}`
+    - `client_id={client_id}`
+    - `code_verifier={code_verifier}`
+  - Response:
+    ```json
+    {
+      "access_token": "...",
+      "token_type": "Bearer",
+      "expires_in": 3600,
+      "id_token": "..."
+    }
+    ```
+- **User Info:** `GET {SOOAUTH_ISSUER}/oauth/userinfo`
+  - Header: `Authorization: Bearer {access_token}`
+  - Returns: `{ "sub": "usr_...", "email": "user@example.com", "email_verified": true }`
+- **End Session / Sign Out:** `POST {SOOAUTH_ISSUER}/auth/sign-out`
+
+---
+
+## 4. Client Integration Guides
+
+### Option A: Using Official JavaScript SDK (`@sooauth/sdk-js`)
+
+Install:
+```bash
+npm install @sooauth/sdk-js
+```
+
+Initialize client:
+```typescript
+import { createSooauthClient } from "@sooauth/sdk-js";
+
+export const auth = createSooauthClient({
+  issuer: process.env.NEXT_PUBLIC_SOOAUTH_ISSUER || "https://auth.sooauth.com",
+  clientId: process.env.NEXT_PUBLIC_SOOAUTH_CLIENT_ID!,
+  redirectUri: process.env.NEXT_PUBLIC_SOOAUTH_REDIRECT_URI!,
+});
+```
+
+Sign-in Trigger:
+```typescript
+await auth.signInWithRedirect();
+```
+
+Callback Handler (e.g. Next.js `/app/callback/page.tsx`):
+```typescript
+"use client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { auth } from "@/lib/auth";
+
+export default function CallbackPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    auth.handleCallback()
+      .then((session) => {
+        console.log("Logged in user:", session.user);
+        router.push("/dashboard");
+      })
+      .catch((err) => {
+        console.error("Auth callback failed:", err);
+      });
+  }, [router]);
+
+  return <p>Completing sign in...</p>;
+}
+```
+
+### Option B: Backend JWT Verification (Node.js / Express / Next.js API)
+
+Verify tokens using standard `jose` or OIDC JWKS:
+```typescript
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+const JWKS = createRemoteJWKSet(
+  new URL(`${process.env.SOOAUTH_ISSUER}/.well-known/jwks.json`)
+);
+
+export async function verifyToken(bearerToken: string) {
+  const token = bearerToken.replace(/^Bearer\s+/, "");
+  const { payload } = await jwtVerify(token, JWKS, {
+    issuer: process.env.SOOAUTH_ISSUER,
+  });
+  return payload; // Contains user ID (sub), email, etc.
+}
+```
+
+### Option C: Python / FastAPI Verification
+
+```python
+import os
+import requests
+from jose import jwt
+
+SOOAUTH_ISSUER = os.getenv("SOOAUTH_ISSUER", "https://auth.sooauth.com")
+JWKS = requests.get(f"{SOOAUTH_ISSUER}/.well-known/jwks.json").json()
+
+def verify_token(token: str):
+    return jwt.decode(
+        token,
+        JWKS,
+        algorithms=["RS256"],
+        issuer=SOOAUTH_ISSUER,
+        options={"verify_aud": False}
+    )
+```
+
+---
+
+## 5. Self-Hosting Reference
+
+Run Sooauth anywhere with Docker Compose:
+
+```yaml
+services:
+  sooauth:
+    image: ghcr.io/sooapps/sooauth:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - BASE_URL=https://auth.yourdomain.com
+      - DATABASE_URL=postgres://sooauth:secret@postgres:5432/sooauth?sslmode=disable
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SIGNING_KEY=your-32-char-random-secret-key-here
+      - SESSION_SECRET=your-32-char-session-secret-key-here
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sooauth
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: sooauth
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
+```
+
+Single command bootstrap:
+```bash
+docker compose up -d
+```
+Admin UI will be available at `http://localhost:8080/admin/`.

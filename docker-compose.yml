@@ -1,0 +1,74 @@
+name: sooauth
+
+services:
+  sooauth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/sooapps/sooauth:latest
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: "8080"
+      SOOAUTH_ENV: ${SOOAUTH_ENV:-production}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      API_URL: ${API_URL:-http://localhost:8080}
+      DATABASE_URL: postgres://${POSTGRES_USER:-sooauth}:${POSTGRES_PASSWORD:-sooauth}@postgres:5432/${POSTGRES_DB:-sooauth}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      AUTO_MIGRATE: "true"
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      BRAND_NAME: ${BRAND_NAME:-sooauth}
+      BRAND_ACCENT: ${BRAND_ACCENT:-#E8FF3F}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sooauth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sooauth}
+      POSTGRES_DB: ${POSTGRES_DB:-sooauth}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-sooauth} -d ${POSTGRES_DB:-sooauth}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  mailhog:
+    profiles: ["dev"]
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  postgres_data:
+  redis_data:

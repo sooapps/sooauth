@@ -1,0 +1,12 @@
+{{define "verify-email-content"}}
+<section class="card">
+  <h1>{{if .Error}}Verification link{{else}}Email verified{{end}}</h1>
+  {{if .Message}}<p class="message">{{.Message}}</p>{{end}}
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  {{if .SignInURL}}
+  <a class="btn" href="{{.SignInURL}}">Back to {{if .BrandName}}{{.BrandName}}{{else}}your app{{end}}</a>
+  {{else}}
+  <a class="btn" href="/auth/sign-in">Sign in</a>
+  {{end}}
+</section>
+{{end}}

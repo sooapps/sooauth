@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-server:
+    name: Backend Tests (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: server/go.sum
+
+      - name: Start Redis & Postgres
+        run: |
+          docker compose up -d postgres redis
+          for i in {1..30}; do
+            if docker compose exec -T postgres pg_isready -U sooauth -d sooauth; then
+              echo "Postgres is ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run Go Tests
+        env:
+          DATABASE_URL: "postgres://sooauth:sooauth@localhost:5433/sooauth?sslmode=disable"
+          REDIS_URL: "redis://localhost:6379/0"
+        run: |
+          cd server
+          go test -v -race ./...
+
+  build-web:
+    name: Frontend Build & Typecheck (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Web
+        run: pnpm --filter @sooauth/web build
+
+  docker-build:
+    name: Docker Image Build Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: docker build -t sooauth:test .

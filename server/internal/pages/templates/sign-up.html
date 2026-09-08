@@ -1,0 +1,21 @@
+{{define "sign-up-content"}}
+<section class="card">
+  <h1>Create account</h1>
+  <p class="card-sub">Start your auth project in minutes.</p>
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  {{if .SocialProviders}}
+  <div class="social">
+    {{range .SocialProviders}}
+    <a class="btn secondary" href="/auth/social/{{.}}/start?return_to={{$.ReturnTo}}{{if $.TenantID}}&amp;tenant_id={{$.TenantID}}{{end}}{{if $.ClientID}}&amp;client_id={{$.ClientID}}{{end}}">Continue with {{providerLabel .}}</a>
+    {{end}}
+  </div>
+  <div class="divider">or email</div>
+  {{end}}
+  <form id="sign-up-form" class="stack">
+    <label>Email<input name="email" type="email" autocomplete="username" required /></label>
+    <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" required /></label>
+    <button type="submit">Sign up</button>
+  </form>
+  <div class="links"><a href="/auth/sign-in">Already have an account?</a></div>
+</section>
+{{end}}

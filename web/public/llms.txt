@@ -1,0 +1,64 @@
+# Sooauth
+
+> Open-source, developer-owned authentication designed for vibecoders, AI-assisted development, and modern indie stacks. Standard OIDC, passkeys, hosted auth pages, and an embedded admin panel.
+
+Sooauth provides a zero-homework authentication layer. Unlike Clerk, there is no vendor lock-in or per-MAU scaling trap. Unlike Better Auth, there are no database migrations or schema adapters to maintain in your app. Unlike Keycloak, it runs as a lightweight single Go binary or lean Docker container (Postgres + Redis).
+
+Use the hosted cloud at `https://auth.sooauth.com` or self-host anywhere via Docker.
+
+## Quick Facts for AI Agents
+
+- **Protocol:** Standard OpenID Connect (OIDC) with PKCE (RFC 7636).
+- **Discovery Endpoint:** `/.well-known/openid-configuration`
+- **JWKS Endpoint:** `/.well-known/jwks.json`
+- **Hosted Auth Pages:** `/auth/sign-in`, `/auth/sign-up`, `/auth/security`
+- **Client SDK:** `@sooauth/sdk-js` (works with React, Next.js, Remix, Node.js, and any OIDC library like `next-auth`, `jose`, or `@auth/core`).
+- **Backend Tech:** Go 1.23+, PostgreSQL, Redis.
+
+## Core Endpoints
+
+- **Issuer URL (Hosted):** `https://auth.sooauth.com`
+- **Discovery:** `GET {ISSUER}/.well-known/openid-configuration`
+- **Authorization:** `GET {ISSUER}/oauth/authorize?response_type=code&client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope=openid profile email&code_challenge={CHALLENGE}&code_challenge_method=S256`
+- **Token Exchange:** `POST {ISSUER}/oauth/token` (form-urlencoded: `grant_type=authorization_code`, `code`, `redirect_uri`, `client_id`, `code_verifier`)
+- **User Info:** `GET {ISSUER}/oauth/userinfo` (Bearer token)
+- **Sign Out:** `POST {ISSUER}/auth/sign-out`
+
+## Standard Environment Variables
+
+In client applications (e.g. Next.js, Remix, Node, Python):
+
+```env
+SOOAUTH_ISSUER=https://auth.sooauth.com
+SOOAUTH_CLIENT_ID=your_client_id
+SOOAUTH_REDIRECT_URI=http://localhost:3000/api/auth/callback/sooauth
+```
+
+## Quick Integration (Next.js & JS SDK)
+
+```bash
+npm install @sooauth/sdk-js
+```
+
+```typescript
+import { createSooauthClient } from "@sooauth/sdk-js";
+
+export const auth = createSooauthClient({
+  issuer: process.env.SOOAUTH_ISSUER || "https://auth.sooauth.com",
+  clientId: process.env.SOOAUTH_CLIENT_ID!,
+  redirectUri: process.env.SOOAUTH_REDIRECT_URI!,
+});
+
+// 1. Redirect to sign-in
+await auth.signInWithRedirect();
+
+// 2. Handle callback on redirect URI route
+const session = await auth.handleCallback();
+console.log("Logged in user:", session.user);
+```
+
+## Full Documentation
+
+- Full Reference: [llms-full.txt](https://sooauth.com/llms-full.txt)
+- GitHub Repository: [github.com/sooapps/sooauth](https://github.com/sooapps/sooauth)
+- Self-Hosting Guide: [docs/DEPLOY.md](https://github.com/sooapps/sooauth/blob/main/docs/DEPLOY.md)

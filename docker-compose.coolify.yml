@@ -1,0 +1,84 @@
+name: sooauth
+
+x-sooauth-env: &sooauth-env
+  SOOAUTH_ENV: production
+  PORT: "8080"
+  APP_URL: ${APP_URL:-https://auth.sooauth.com}
+  DATABASE_URL: postgres://${POSTGRES_USER:-sooauth}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sooauth}?sslmode=disable
+  REDIS_URL: redis://redis:6379
+  AUTO_MIGRATE: "true"
+  SMTP_URL: ${SMTP_URL:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-465}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-noreply@sooauth.com}
+  ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+  GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+  BRAND_NAME: ${BRAND_NAME:-sooauth}
+  BRAND_LOGO_URL: ${BRAND_LOGO_URL:-}
+  BRAND_ACCENT: ${BRAND_ACCENT:-#E8FF3F}
+  MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+  WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-sooauth.com}
+  BILLING_MANUAL_UPGRADE: ${BILLING_MANUAL_UPGRADE:-false}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sooauth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-sooauth}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-sooauth} -d ${POSTGRES_DB:-sooauth}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # TEMP — Navicat: host 5433 → container 5432. Remove after manual DB work.
+    ports:
+      - "5436:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  sooauth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      <<: *sooauth-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

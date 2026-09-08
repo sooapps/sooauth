@@ -1,0 +1,1120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard · sooauth</title>
+  <link rel="icon" type="image/png" href="/dashboard/sooauth-light.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Syne:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --surface: #F5F5F5;
+      --surface-2: #FFFFFF;
+      --border: #C4C4C4;
+      --text: #051B23;
+      --muted: #5D6B70;
+      --accent: #E8FF3F;
+      --accent-soft: rgba(232, 255, 63, 0.35);
+      --success: #051B23;
+      --warn: #051B23;
+      --danger: #051B23;
+      --sidebar-w: 240px;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0E0F11;
+      --surface: #1C1D1F;
+      --surface-2: #29292B;
+      --border: #353537;
+      --text: #F5F6F6;
+      --muted: #9D9E9F;
+      --accent-soft: rgba(232, 255, 63, 0.14);
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #FFFFFF;
+      --surface: #F5F5F5;
+      --surface-2: #FFFFFF;
+      --border: #C4C4C4;
+      --text: #051B23;
+      --muted: #5D6B70;
+      --accent-soft: rgba(232, 255, 63, 0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+       width: var(--sidebar-w);
+       flex: 0 0 var(--sidebar-w);
+       background: var(--surface);
+      border-right: 1px solid var(--border);
+       padding: 24px 16px 18px;
+      display: flex;
+      flex-direction: column;
+       gap: 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .brand {
+       display: flex;
+       align-items: center;
+       gap: 8px;
+      font-family: Syne, sans-serif;
+      font-weight: 700;
+       font-size: 1.35rem;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      text-decoration: none;
+       padding: 0 10px;
+    }
+     .brand img { width: 32px; height: 32px; object-fit: contain; }
+    .brand small { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 600; margin-top: 2px; }
+    .nav { display: grid; gap: 3px; }
+    .sidebar-project { display: grid; gap: 10px; padding: 0 10px 18px; border-bottom: 1px solid var(--border); }
+    .sidebar-project .select, .sidebar-project .btn { width: 100%; min-width: 0; }
+    .nav-label { padding: 0 10px 5px; color: var(--muted); font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+    .nav button {
+      text-align: left;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+       padding: 10px 12px;
+       border-radius: 7px;
+    }
+    .nav button:hover { background: var(--surface-2); color: var(--text); }
+    .nav button.active { background: var(--accent); color: var(--text); font-weight: 600; }
+    .sidebar-links { display: grid; gap: 7px; padding-top: 2px; border-top: 1px solid var(--border); }
+    .sidebar-foot { margin-top: auto; padding: 14px 8px 0; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); }
+    .sidebar-foot .email { color: var(--text); font-weight: 500; margin-bottom: 8px; word-break: break-all; }
+    .sidebar-docs {
+      display: block;
+       margin: 0;
+       padding: 9px 10px;
+       border-radius: 7px;
+       border: 1px solid transparent;
+      background: var(--surface-2);
+      color: var(--text);
+      text-decoration: none;
+       font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+    }
+    .sidebar-docs:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .main { flex: 1; min-width: 0; width: 0; max-width: 1440px; padding: 34px clamp(20px, 4vw, 64px) 64px; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+       margin-bottom: 32px;
+    }
+    .topbar h1 { margin: 0; font-family: Syne, sans-serif; font-size: clamp(1.45rem, 2.2vw, 2rem); font-weight: 700; letter-spacing: -0.04em; }
+    .topbar-title { min-width: 0; }
+    .project-pill {
+      margin: 4px 0 0;
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+    .project-pill strong { color: var(--text); font-weight: 600; }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .select, .btn {
+      font: inherit;
+      font-size: 0.875rem;
+       border-radius: 0;
+      padding: 9px 14px;
+    }
+    .select {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      min-width: 180px;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn:hover { border-color: var(--muted); }
+    .btn-primary { background: var(--accent); border-color: var(--text); color: var(--text); font-weight: 600; }
+    .btn-primary:hover { filter: brightness(1.06); }
+    .btn-ghost { background: transparent; }
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 0;
+      background: var(--accent-soft);
+      color: var(--text);
+      border: 1px solid var(--text);
+    }
+    .panel { display: none; animation: fade .2s ease; }
+    .panel.active { display: block; }
+    @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+       border-radius: 10px;
+       padding: clamp(18px, 2.5vw, 28px);
+       margin-bottom: 18px;
+       overflow: hidden;
+    }
+    .card h2 { margin: 0 0 6px; font-size: 1.05rem; }
+    .card p.desc { margin: 0 0 18px; color: var(--muted); font-size: 0.875rem; line-height: 1.5; }
+    .grid-2 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .integration-fields { display: grid; gap: 16px; }
+    .integration-fields .field-client { max-width: 420px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+    .copy-row { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+    .copy-row input, .copy-row .value {
+      flex: 1;
+      min-width: 0;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+       border-radius: 0;
+      padding: 10px 12px;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.875rem;
+    }
+    .copy-row .value {
+      overflow-x: auto;
+      white-space: nowrap;
+      word-break: normal;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8125rem;
+      scrollbar-width: thin;
+    }
+    input[type=text], input[type=url], input[type=password], input:not([type]) {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+       border-radius: 0;
+      padding: 10px 12px;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.875rem;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+    input:disabled { opacity: .55; }
+    .uri-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .uri-row input { margin: 0; }
+    .btn-icon {
+      width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; flex-shrink: 0;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: .04em; }
+    .empty { color: var(--muted); text-align: center; padding: 32px 16px; }
+    .alert {
+      padding: 12px 14px; border-radius: 0; margin-bottom: 16px; font-size: 0.875rem;
+      background: var(--surface); border: 1px solid var(--text); color: var(--text);
+    }
+    .notice {
+       padding: 12px 14px; border-radius: 0; margin-bottom: 16px; font-size: 0.875rem;
+       background: var(--accent-soft); border: 1px solid var(--text); color: var(--text);
+    }
+    .provider-list { display: grid; gap: 12px; }
+    .provider-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        padding: 18px 20px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+    }
+    .provider-item .info h3 { margin: 0 0 4px; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+    .provider-item .info p { margin: 0; font-size: 0.8125rem; color: var(--muted); line-height: 1.45; }
+    .provider-custom {
+       margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+      display: grid; gap: 10px; max-width: 520px;
+    }
+    .provider-custom .mode-row { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.8125rem; }
+    .provider-custom label.mode { display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text); }
+    .provider-custom .callback { font-size: 0.8125rem; color: var(--muted); }
+    .provider-custom .callback-label { margin: 0 0 6px; font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .field-hint { margin: 6px 0 0; font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+    .secret-saved {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--success);
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(127,212,168,.12);
+      vertical-align: middle;
+    }
+    input.secret-masked { letter-spacing: 0.12em; font-family: ui-monospace, monospace; }
+    .provider-custom .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .provider-item-wrap { display: grid; gap: 0; }
+     .provider-item-wrap > .provider-item { border-radius: 10px; }
+    .provider-item-wrap > .provider-custom-panel {
+        display: none; padding: 0 20px 18px; background: var(--surface-2); border: 1px solid var(--border);
+        border-top: none; border-radius: 0 0 10px 10px;
+     }
+     .provider-item-wrap.is-open > .provider-item { border-radius: 10px 10px 0 0; border-bottom-color: transparent; }
+     .provider-item-wrap.is-open > .provider-custom-panel { display: block; }
+    .status-dot { font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 0; }
+    .status-dot.on { background: rgba(127,212,168,.15); color: var(--success); }
+    .status-dot.off { background: rgba(148,144,168,.15); color: var(--muted); }
+    .status-dot.soon { background: rgba(245,194,107,.12); color: var(--warn); }
+    .switch { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch span {
+       position: absolute; inset: 0; background: #353537; border-radius: 0; cursor: pointer; transition: .2s;
+    }
+    .switch span:before {
+       content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px; background: #fff; border-radius: 0; transition: .2s;
+    }
+    .switch input:checked + span { background: var(--accent); }
+    .switch input:checked + span:before { transform: translateX(20px); }
+    .switch input:disabled + span { opacity: .45; cursor: not-allowed; }
+    .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .plan-card {
+      border: 1px solid var(--border);
+       border-radius: 0;
+      padding: 20px;
+      background: var(--surface-2);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .plan-card.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); }
+    .plan-card h3 { margin: 0; font-size: 1.05rem; }
+    .plan-price { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; }
+    .plan-price small { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+    .plan-features { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.875rem; display: grid; gap: 6px; }
+    .plan-actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+    .metric-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
+     .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 0; padding: 16px; }
+    .metric strong { display: block; font-size: 1.6rem; letter-spacing: -0.03em; }
+    .metric span { color: var(--muted); font-size: 0.78rem; }
+    .webhook-list { display: grid; gap: 12px; }
+     .webhook-item { background: var(--surface-2); border: 1px solid var(--border); border-radius: 0; padding: 16px; }
+    .webhook-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .webhook-url { font-family: ui-monospace, monospace; font-size: 0.8125rem; word-break: break-all; }
+    .webhook-events { color: var(--muted); font-size: 0.8rem; margin: 8px 0 14px; }
+    .webhook-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .event-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin: 8px 0 16px; }
+    .event-grid label { color: var(--muted); font-size: 0.8125rem; display: flex; gap: 7px; align-items: center; }
+    @media (max-width: 860px) {
+      .app { flex-direction: column; }
+       .sidebar { width: 100%; flex-basis: auto; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
+       .nav { grid-template-columns: repeat(2, 1fr); }
+       .sidebar-links { grid-template-columns: repeat(2, 1fr); }
+       .main { padding: 20px 16px 40px; }
+     }
+     @media (max-width: 520px) {
+       .topbar-actions { width: 100%; }
+       .topbar-actions > * { flex: 1; min-width: 0; }
+       .select { min-width: 0; width: 100%; }
+       .copy-row { flex-wrap: wrap; }
+       .copy-row .btn { width: 100%; }
+       .provider-item { align-items: flex-start; }
+       .provider-item .info { min-width: 0; }
+       table { display: block; overflow-x: auto; white-space: nowrap; }
+     }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+       <a class="brand" href="https://sooauth.com"><img src="/dashboard/sooauth-light.png" alt="sooauth" /><span>sooauth<small>dashboard</small></span></a>
+       <div class="sidebar-project">
+         <select class="select" id="project-select" hidden></select>
+         <button type="button" class="btn btn-primary" id="add-project" hidden>+ New project</button>
+       </div>
+       <nav class="nav" id="nav">
+         <div class="nav-label">Workspace</div>
+        <button type="button" class="active" data-tab="integration">Integration</button>
+        <button type="button" data-tab="overview">Overview</button>
+        <button type="button" data-tab="providers">Social login</button>
+        <button type="button" data-tab="project">Project</button>
+        <button type="button" data-tab="users">Users</button>
+        <button type="button" data-tab="sessions">Sessions</button>
+        <button type="button" data-tab="theme">Theme</button>
+        <button type="button" data-tab="billing">Billing</button>
+        <button type="button" data-tab="audit">Audit</button>
+         <button type="button" data-tab="webhooks">Webhooks</button>
+       </nav>
+       <div class="sidebar-links" aria-label="Resources">
+         <div class="nav-label">Resources</div>
+         <a class="sidebar-docs" href="https://sooauth.com/docs" target="_blank" rel="noopener">Documentation <span aria-hidden="true">↗</span></a>
+         <a class="sidebar-docs" href="https://sooauth.com/docs/integrate-oidc#ai-prompt" target="_blank" rel="noopener">AI setup prompt <span aria-hidden="true">↗</span></a>
+         <a class="sidebar-docs" href="/auth/account">Security Center <span aria-hidden="true">↗</span></a>
+         <button type="button" class="sidebar-docs" id="theme-toggle">Use dark theme</button>
+       </div>
+      <div class="sidebar-foot">
+        <div class="email" id="dash-user"></div>
+        <button type="button" class="btn btn-ghost" id="sign-out" style="width:100%">Sign out</button>
+      </div>
+    </aside>
+    <main class="main">
+      <div id="global-alert" hidden></div>
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1 id="page-title">Integration</h1>
+          <p class="project-pill" id="project-pill" hidden>Editing <strong id="project-pill-name"></strong></p>
+        </div>
+         <div class="topbar-actions">
+           <span class="badge" id="plan-badge" hidden></span>
+        </div>
+      </header>
+
+      <section class="panel active" id="panel-integration"></section>
+      <section class="panel" id="panel-overview"></section>
+      <section class="panel" id="panel-providers"></section>
+      <section class="panel" id="panel-project"></section>
+      <section class="panel" id="panel-users"></section>
+      <section class="panel" id="panel-sessions"></section>
+      <section class="panel" id="panel-theme"></section>
+      <section class="panel" id="panel-billing"></section>
+      <section class="panel" id="panel-audit"></section>
+      <section class="panel" id="panel-webhooks"></section>
+    </main>
+  </div>
+  <script>
+    const titles = {
+      integration: "Integration",
+      overview: "Overview",
+      providers: "Social login",
+      project: "Project settings",
+      users: "App users",
+      sessions: "Sessions",
+      theme: "Theme",
+      billing: "Billing",
+      audit: "Audit log",
+      webhooks: "Webhooks",
+    };
+    const providerLabels = { google: "Google", github: "GitHub", facebook: "Facebook", x: "X" };
+    const SECRET_MASK = "****************";
+    let dashMe = null;
+    let activeTab = "integration";
+
+    function csrfToken() {
+      const m = document.cookie.match(/(?:^|; )sooauth_csrf=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : "";
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+    function embedSnippet(data) {
+      const issuer = (data.issuer || "").replace(/\/$/, "");
+      return `<div id="sooauth-widget"></div>\n<script src="${issuer}/v1/widget/embed.js" data-client-id="${data.client_id}" data-mode="signin" async><\/script>`;
+    }
+    function formatWhen(iso) {
+      if (!iso) return "—";
+      try {
+        return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      } catch { return iso; }
+    }
+    function showAlert(msg) {
+      const el = document.getElementById("global-alert");
+      el.hidden = false; el.className = "alert"; el.textContent = msg;
+    }
+    function showNotice(msg) {
+      const el = document.getElementById("global-alert");
+      el.hidden = false; el.className = "notice"; el.textContent = msg;
+      setTimeout(() => { el.hidden = true; }, 3500);
+    }
+    async function api(path, opts = {}) {
+      const res = await fetch("/dashboard/api" + path, { credentials: "same-origin", ...opts });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { location.href = "/auth/sign-in?return_to=/dashboard/"; return null; }
+      if (!res.ok) throw new Error(data.message || data.error || "request_failed");
+      return data;
+    }
+    function showTab(name, updateHash = true) {
+      if (!titles[name]) name = "integration";
+      activeTab = name;
+      document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + name));
+      document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+      updatePageTitle();
+      if (updateHash) {
+        const next = name === "integration" ? "#integration" : "#" + name;
+        if (location.hash !== next) history.replaceState(null, "", "/dashboard/" + next);
+      }
+    }
+    function updatePageTitle() {
+      const base = titles[activeTab] || activeTab;
+      const project = dashMe?.project?.name;
+      document.getElementById("page-title").textContent = project ? `${base} · ${project}` : base;
+    }
+    function updateProjectPill(me) {
+      const pill = document.getElementById("project-pill");
+      const nameEl = document.getElementById("project-pill-name");
+      if (!pill || !nameEl || !me?.project?.name) {
+        if (pill) pill.hidden = true;
+        return;
+      }
+      nameEl.textContent = me.project.name;
+      pill.hidden = false;
+    }
+    function tabFromHash() {
+      const raw = (location.hash || "#integration").replace(/^#/, "");
+      return titles[raw] ? raw : "integration";
+    }
+    window.addEventListener("hashchange", () => showTab(tabFromHash(), false));
+    document.querySelectorAll("#nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+    document.getElementById("sign-out").onclick = async () => {
+      const btn = document.getElementById("sign-out");
+      btn.disabled = true;
+      try {
+        const res = await fetch("/auth/sign-out", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": csrfToken() } });
+        if (!res.ok) throw new Error("sign_out_failed");
+        location.href = "/auth/sign-in";
+      } catch (e) {
+        btn.disabled = false;
+        showAlert("Sign out failed. Refresh and try again.");
+      }
+    };
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => showNotice("Copied to clipboard.")).catch(() => showAlert("Could not copy."));
+    }
+
+    function renderUriRows(container, uris) {
+      const list = uris.length ? uris : [""];
+      container.innerHTML = list.map((uri, i) => `
+        <div class="uri-row">
+          <input type="url" name="redirect_uri" value="${escapeHtml(uri)}" placeholder="https://yourapp.com/api/auth/callback/oidc or /login" />
+          ${i === list.length - 1
+            ? `<button type="button" class="btn btn-icon" data-add-uri title="Add">+</button>`
+            : `<button type="button" class="btn btn-icon" data-remove-uri title="Remove">×</button>`}
+        </div>`).join("");
+      container.querySelectorAll("[data-add-uri]").forEach(btn => btn.onclick = () => {
+        renderUriRows(container, [...container.querySelectorAll('input[name="redirect_uri"]')].map(i => i.value).concat([""]));
+      });
+      container.querySelectorAll("[data-remove-uri]").forEach(btn => btn.onclick = () => {
+        const row = btn.closest(".uri-row");
+         const vals = [...container.querySelectorAll('input[name="redirect_uri"]')].filter(i => i.closest('.uri-row') !== row).map(i => i.value);
+        renderUriRows(container, vals.length ? vals : [""]);
+      });
+    }
+    function collectUris(c) {
+      return [...c.querySelectorAll('input[name="redirect_uri"]')].map(i => i.value.trim()).filter(Boolean);
+    }
+
+    async function refreshDashboard() {
+      dashMe = await api("/me");
+      if (!dashMe) return;
+      setupHeader(dashMe);
+      updateProjectPill(dashMe);
+      updatePageTitle();
+      await Promise.all([
+        loadIntegration(), loadOverview(), loadProviders(), loadProject(), loadUsers(),
+        loadSessions(), loadTheme(), loadBilling(), loadAudit(), loadWebhooks(),
+      ]);
+    }
+
+    async function setupHeader(me) {
+      if (me?.email) document.getElementById("dash-user").textContent = me.email;
+      if (!me?.projects?.length) return;
+      const sel = document.getElementById("project-select");
+      const add = document.getElementById("add-project");
+      const badge = document.getElementById("plan-badge");
+      sel.hidden = false; badge.hidden = false;
+      badge.textContent = me.account?.plan_label || "Free";
+      badge.style.cursor = "pointer";
+      badge.title = "View billing";
+      badge.onclick = () => showTab("billing");
+      sel.innerHTML = me.projects.map(p => `<option value="${p.id}" ${p.id === me.project?.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("");
+      const canAdd = (me.account?.project_count || 0) < (me.account?.max_projects || 1);
+      add.hidden = !canAdd;
+      sel.onchange = async () => {
+        const prev = me.project?.id;
+        const nextName = sel.options[sel.selectedIndex]?.text || "project";
+        sel.disabled = true;
+        try {
+          await api("/projects/" + sel.value + "/select", { method: "POST" });
+          showNotice("Switched to " + nextName + " — refreshing…");
+          await refreshDashboard();
+          showTab(activeTab, false);
+        } catch (e) {
+          if (prev) sel.value = prev;
+          showAlert(e.message);
+        } finally {
+          sel.disabled = false;
+        }
+      };
+      add.onclick = async () => {
+        const name = prompt("Project name:");
+        if (name === null) return;
+        try {
+          await api("/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+          showNotice("Project created.");
+          await refreshDashboard();
+        } catch (e) { showAlert(e.message); }
+      };
+    }
+
+    async function loadOverview() {
+      const el = document.getElementById("panel-overview");
+      try {
+        const [users, sessions, audit] = await Promise.all([api("/users"), api("/sessions"), api("/audit")]);
+        const userRows = users?.users || [];
+        const sessionRows = sessions?.sessions || [];
+        const auditRows = audit?.entries || [];
+        el.innerHTML = `<div class="metric-grid">
+          <div class="metric"><strong>${userRows.length}</strong><span>App users</span></div>
+          <div class="metric"><strong>${sessionRows.length}</strong><span>Active sessions</span></div>
+          <div class="metric"><strong>${auditRows.length}</strong><span>Recent audit events</span></div>
+        </div>
+         <div class="card"><h2>Recent activity</h2><p class="desc">Overview is a quick health check for this project: app users, active sessions, and the latest authentication events. Use Users and Sessions for detailed actions.</p>
+          ${auditRows.length ? `<table><thead><tr><th>Time</th><th>Action</th><th>IP</th></tr></thead><tbody>${auditRows.slice(0, 8).map(e => `<tr><td>${escapeHtml(formatWhen(e.created_at))}</td><td>${escapeHtml(e.action)}</td><td>${escapeHtml(e.ip || "—")}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No events yet.</div>`}
+        </div>`;
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    const webhookEvents = ["user.created", "user.login", "user.login_failed", "user.email_verified", "password.reset", "session.revoked"];
+
+    async function loadWebhooks() {
+      const el = document.getElementById("panel-webhooks");
+      try {
+        const data = await api("/webhooks");
+        const rows = data?.webhooks || [];
+        el.innerHTML = `<div class="card">
+          <h2>Add endpoint</h2>
+           <p class="desc">Webhooks keep your application database in sync with Sooauth. When a user is created, verifies email, signs in, resets a password, or is removed from a session, Sooauth sends a signed JSON event to your HTTPS endpoint. Store the event ID and update your local user record; do not treat the webhook as a replacement for token validation.</p>
+          <form id="webhook-form" style="max-width:620px">
+            <div class="field"><label>Endpoint URL</label><input name="url" type="url" required placeholder="https://yourapp.com/hooks/sooauth"></div>
+            <div class="field"><label>Events</label><div class="event-grid">${webhookEvents.map(event => `<label><input type="checkbox" name="event" value="${event}" checked style="width:auto"> ${event}</label>`).join("")}</div></div>
+            <button type="submit" class="btn btn-primary">Create endpoint</button>
+          </form>
+        </div>
+        <div class="card"><h2>${rows.length ? `${rows.length} webhook endpoint${rows.length === 1 ? "" : "s"}` : "Webhook endpoints"}</h2>
+          ${rows.length ? `<div class="webhook-list">${rows.map(w => `<article class="webhook-item">
+            <div class="webhook-head"><div><div class="webhook-url">${escapeHtml(w.url)}</div><div class="webhook-events">${(w.events || []).map(escapeHtml).join(" · ") || "All events"} · added ${escapeHtml(formatWhen(w.created_at))}</div></div><span class="status-dot ${w.active ? "on" : "off"}">${w.active ? "Active" : "Inactive"}</span></div>
+            <div class="webhook-actions"><button type="button" class="btn" data-test-webhook="${escapeHtml(w.id)}">Send test</button><button type="button" class="btn" data-delete-webhook="${escapeHtml(w.id)}">Delete</button></div>
+          </article>`).join("")}</div>` : `<div class="empty">No endpoints configured yet.</div>`}
+        </div>`;
+        document.getElementById("webhook-form").onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          const events = fd.getAll("event");
+          try {
+            const result = await api("/webhooks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: fd.get("url"), events }) });
+            el.insertAdjacentHTML("afterbegin", `<div class="notice" id="new-webhook-secret"><strong>Endpoint created.</strong> Copy this signing secret now; it will not be shown again.<div class="copy-row" style="margin-top:10px"><div class="value">${escapeHtml(result.secret || "")}</div><button type="button" class="btn" data-copy-secret>Copy</button></div></div>`);
+            el.querySelector("[data-copy-secret]").onclick = () => copyText(result.secret || "");
+            showNotice("Webhook endpoint created.");
+            e.target.reset();
+          } catch (err) { showAlert(err.message); }
+        };
+        el.querySelectorAll("[data-test-webhook]").forEach(btn => btn.onclick = async () => {
+          btn.disabled = true;
+          try { await api("/webhooks/" + btn.dataset.testWebhook + "/test", { method: "POST" }); showNotice("Test delivery succeeded."); }
+          catch (err) { showAlert("Test delivery failed: " + err.message); }
+          finally { btn.disabled = false; }
+        });
+        el.querySelectorAll("[data-delete-webhook]").forEach(btn => btn.onclick = async () => {
+          if (!confirm("Delete this webhook endpoint?")) return;
+          try { await api("/webhooks/" + btn.dataset.deleteWebhook, { method: "DELETE" }); showNotice("Webhook endpoint deleted."); loadWebhooks(); }
+          catch (err) { showAlert(err.message); }
+        });
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    async function loadIntegration() {
+      const el = document.getElementById("panel-integration");
+      try {
+        const data = await api("/integration");
+        const canCustom = Boolean(data.can_custom_social_callback);
+        const origin = data.social_callback_origin || "";
+        const appCallback = data.app_google_callback_url || "";
+        const platformCallback = data.platform_google_callback_url || "";
+        const proxyRoute = data.google_proxy_route || "/api/auth/google/callback";
+        const appReady = Boolean((data.redirect_uris || []).length);
+        el.innerHTML = `
+          <div class="card">
+            <h2>Start here</h2>
+            <p class="desc">Connect your first app in five minutes. Keep this checklist open while you integrate.</p>
+            <ul class="plan-features" style="list-style:none;padding-left:0">
+              <li>${appReady ? "✓" : "○"} Copy your issuer, client ID, and discovery URL below.</li>
+              <li>${appReady ? "✓" : "○"} Add an exact callback URL under Redirect URIs.</li>
+              <li>○ Use the <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline;text-underline-offset:3px">OIDC setup prompt</a> or your framework&apos;s OIDC library.</li>
+              <li>○ Test the hosted sign-in flow before shipping.</li>
+            </ul>
+            <a href="/auth/sign-in?return_to=/dashboard/" class="btn btn-primary" style="margin-top:16px">Test sign-in</a>
+          </div>
+          <div class="card">
+            <h2>Connect your app</h2>
+            <p class="desc">Copy issuer and client ID into your app&apos;s OIDC config. Social keys stay in Sooauth only — not in your codebase.</p>
+             <p class="desc" style="margin-top:-8px"><a href="https://sooauth.com/docs/integrate-oidc#ai-prompt" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline;text-underline-offset:3px">Open docs + AI prompt ↗</a></p>
+            <div class="integration-fields">
+              <div class="field"><label>Issuer</label><div class="copy-row"><div class="value">${escapeHtml(data.issuer)}</div><button type="button" class="btn" data-copy="${escapeHtml(data.issuer)}">Copy</button></div></div>
+              <div class="field field-client"><label>Client ID</label><div class="copy-row"><div class="value">${escapeHtml(data.client_id)}</div><button type="button" class="btn" data-copy="${escapeHtml(data.client_id)}">Copy</button></div></div>
+              <div class="field"><label>Discovery URL</label><div class="copy-row"><div class="value">${escapeHtml(data.discovery_url)}</div><button type="button" class="btn" data-copy="${escapeHtml(data.discovery_url)}">Copy</button></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Google OAuth app settings</h2>
+            <p class="desc">Provider activation is managed under <strong>Social login</strong>. This section is only for advanced Google OAuth branding: use your own Google OAuth app so Google can show your domain instead of Sooauth.</p>
+            ${canCustom ? `<p class="desc">Free plans always use <code style="font-family:var(--mono)">${escapeHtml(platformCallback)}</code> — Google shows <strong>sooauth.com</strong>. On Pro+, with a <strong>custom Google OAuth app</strong>, set your app origin so Google shows your domain on the account picker.</p>
+            <div class="field">
+              <label>App origin (Pro + custom Google OAuth)</label>
+              <input type="url" id="social-callback-origin" placeholder="https://api.yourapp.com" value="${escapeHtml(origin)}" autocomplete="off">
+              <p class="desc" style="margin-top:8px">Must match the host of a redirect URI below (e.g. <code style="font-family:var(--mono)">https://api.soobrief.com</code>).</p>
+            </div>
+            ${origin ? `<div class="field"><label>Google redirect URI (Cloud Console)</label><div class="copy-row"><div class="value">${escapeHtml(appCallback)}</div><button type="button" class="btn" data-copy="${escapeHtml(appCallback)}">Copy</button></div></div>
+            <p class="desc">Add a proxy route in your app: <code style="font-family:var(--mono)">GET ${escapeHtml(proxyRoute)}</code> → forward <code style="font-family:var(--mono)">code</code> and <code style="font-family:var(--mono)">state</code> to <code style="font-family:var(--mono)">${escapeHtml(platformCallback)}</code>. <a href="https://sooauth.com/docs/google-oauth#app-callback" target="_blank" rel="noopener" style="color:var(--accent)">Docs ↗</a></p>` : `<p class="desc">Save an origin to get your app-specific Google redirect URI and proxy route snippet.</p>`}
+            <button type="button" class="btn btn-primary" id="save-google-branding" style="margin-top:12px">Save Google branding</button>` : `<div class="notice">Free plan: Google sign-in uses sooauth platform OAuth. The account picker shows <strong>sooauth.com</strong>. Upgrade to Pro and add a custom Google OAuth app to show your brand.</div>`}
+          </div>
+          <div class="card">
+            <h2>Embed widget</h2>
+            <p class="desc">Drop this on any page. Theme comes from your Brand tab. Free plans show &quot;Powered by sooauth&quot;.</p>
+            <div class="field">
+              <label>Script tag</label>
+              <div class="copy-row">
+                <div class="value" style="font-size:12px;word-break:break-all">${escapeHtml(embedSnippet(data))}</div>
+                <button type="button" class="btn" data-copy="${escapeHtml(embedSnippet(data))}">Copy</button>
+              </div>
+            </div>
+            <p class="desc" style="margin-top:12px">Listen for <code style="font-family:var(--mono)">sooauth:login</code> on <code style="font-family:var(--mono)">document</code> to receive <code style="font-family:var(--mono)">access_token</code> after sign-in.</p>
+          </div>
+          <div class="card">
+            <h2>Redirect URIs</h2>
+            <p class="desc">OIDC: exact callback paths (e.g. <code>/api/auth/callback/oidc</code>). Custom UI / embed Google: add your login and sign-up page URLs too (e.g. <code>/login</code>, <code>/register</code>) — sooauth only sends <code>widget_code</code> back to hosts listed here. One URL per host:port is enough for social; list each environment.</p>
+            <form id="integration-form">
+              <div id="uri-list"></div>
+              <button type="submit" class="btn btn-primary" style="margin-top:12px">Save URIs</button>
+            </form>
+          </div>`;
+        renderUriRows(document.getElementById("uri-list"), data.redirect_uris || []);
+         el.querySelectorAll("[data-copy]").forEach(btn => btn.onclick = () => copyText(btn.dataset.copy));
+         async function saveIntegrationSettings() {
+          const uris = collectUris(document.getElementById("uri-list"));
+          if (!uris.length) return showAlert("Add at least one redirect URI.");
+          const payload = { redirect_uris: uris };
+          const originInput = document.getElementById("social-callback-origin");
+          if (originInput) payload.social_callback_origin = originInput.value.trim();
+          await api("/integration", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+          showNotice("Integration settings saved.");
+          loadIntegration();
+        }
+        document.getElementById("integration-form").onsubmit = async (e) => {
+          e.preventDefault();
+          await saveIntegrationSettings();
+        };
+        const saveBranding = document.getElementById("save-google-branding");
+        if (saveBranding) saveBranding.onclick = () => saveIntegrationSettings().catch(err => showAlert(err.message));
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    async function loadProviders() {
+      const el = document.getElementById("panel-providers");
+      try {
+        const data = await api("/providers");
+        const items = (data.providers || []).map(p => {
+          const label = providerLabels[p.provider] || p.provider;
+          const canToggle = p.platform_ready || p.has_custom || p.can_use_custom;
+          let status = p.enabled ? (p.login_ready ? "on" : "soon") : "off";
+          let statusText = p.enabled ? (p.login_ready ? "Live on login page" : "Needs credentials") : "Off";
+          const modeDesc = p.has_custom
+            ? `Custom OAuth app${p.client_id_hint ? " · " + p.client_id_hint : ""}`
+            : (p.platform_ready
+              ? "Using sooauth platform OAuth (Google shows sooauth.com on Free)."
+              : "Platform OAuth unavailable — add custom credentials to enable.");
+          const customPanel = p.can_use_custom ? `
+            <div class="provider-custom-panel">
+              <div class="provider-custom">
+                <div class="mode-row">
+                  <label class="mode"><input type="radio" name="mode-${p.provider}" value="platform" ${!p.has_custom ? "checked" : ""} data-mode /> Use sooauth platform</label>
+                  <label class="mode"><input type="radio" name="mode-${p.provider}" value="custom" ${p.has_custom ? "checked" : ""} data-mode /> Custom OAuth app</label>
+                </div>
+                <p class="callback-label">Redirect URI (add this in ${label} Cloud Console)</p>
+                <div class="copy-row" style="margin-bottom:12px">
+                  <div class="value">${escapeHtml(p.callback_url || "")}</div>
+                  <button type="button" class="btn" data-copy="${escapeHtml(p.callback_url || "")}">Copy</button>
+                </div>
+                <div class="custom-fields" data-custom-fields style="${p.has_custom ? "" : "display:none"}">
+                  <div class="field"><label>Client ID</label><input type="text" data-client-id autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="verbatim" name="sooauth-oauth-client-id-${escapeHtml(p.provider)}" value="${escapeHtml(p.client_id || "")}" placeholder="Paste full Client ID from ${label}"></div>
+                  <div class="field">
+                    <label>Client secret${p.has_client_secret ? ' <span class="secret-saved">Saved</span>' : ""}</label>
+                    <input type="password" data-client-secret autocomplete="new-password" name="sooauth-oauth-client-secret-${escapeHtml(p.provider)}" data-secret-saved="${p.has_client_secret ? "1" : "0"}" placeholder="${p.has_client_secret ? "" : "Required"}">
+                    ${p.has_client_secret ? '<p class="field-hint">Click the field to replace the stored secret.</p>' : ""}
+                  </div>
+                  <div class="actions">
+                    <button type="button" class="btn btn-primary" data-save-custom>Save custom credentials</button>
+                    ${p.has_custom ? `<button type="button" class="btn" data-use-platform>Use platform instead</button>` : ""}
+                  </div>
+                </div>
+              </div>
+            </div>` : "";
+          return `<div class="provider-item-wrap" data-provider="${escapeHtml(p.provider)}">
+            <article class="provider-item">
+            <div class="info">
+              <h3>${label} <span class="status-dot ${status}">${statusText}</span></h3>
+              <p>${modeDesc}</p>
+            </div>
+            <label class="switch" title="${canToggle ? "Toggle" : "Add custom credentials first"}">
+              <input type="checkbox" data-toggle ${p.enabled ? "checked" : ""} ${canToggle ? "" : "disabled"} />
+              <span></span>
+            </label>
+          </article>${customPanel}</div>`;
+        }).join("");
+         el.innerHTML = `
+           <div class="notice">Turn providers on for your login widget. <strong>Free:</strong> platform OAuth — Google shows <code>sooauth.com</code>. <strong>Pro + custom OAuth app:</strong> set app origin under Integration → Google sign-in branding so Google shows your domain.</div>
+           <div class="provider-list">${items}</div>`;
+         el.querySelectorAll(".provider-item").forEach(item => item.onclick = (event) => {
+           if (event.target.closest("button, input, label, a")) return;
+           item.closest(".provider-item-wrap")?.classList.toggle("is-open");
+         });
+         el.querySelectorAll("[data-copy]").forEach(btn => btn.onclick = () => copyText(btn.dataset.copy));
+        el.querySelectorAll("[data-toggle]").forEach(input => {
+          input.onchange = async () => {
+            const wrap = input.closest("[data-provider]");
+            const provider = wrap.dataset.provider;
+            try {
+              await api("/providers/" + provider, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled: input.checked }),
+              });
+              showNotice(input.checked ? "Provider enabled." : "Provider disabled.");
+              loadProviders();
+            } catch (err) {
+              input.checked = !input.checked;
+              showAlert(err.message);
+            }
+          };
+        });
+        el.querySelectorAll("[data-mode]").forEach(radio => {
+          radio.onchange = () => {
+            const wrap = radio.closest("[data-provider]");
+            const fields = wrap.querySelector("[data-custom-fields]");
+            if (fields) fields.style.display = radio.value === "custom" ? "" : "none";
+          };
+        });
+        el.querySelectorAll("[data-save-custom]").forEach(btn => {
+          btn.onclick = async () => {
+            const wrap = btn.closest("[data-provider]");
+            const provider = wrap.dataset.provider;
+            const mode = wrap.querySelector("[data-mode]:checked")?.value;
+            if (mode !== "custom") return showAlert("Select “Custom OAuth app” first.");
+            const clientId = wrap.querySelector("[data-client-id]")?.value?.trim() || "";
+            const secretInput = wrap.querySelector("[data-client-secret]");
+            let clientSecret = secretInput?.value || "";
+            if (secretInput?.dataset.secretSaved === "1" && (clientSecret === "" || clientSecret === SECRET_MASK)) {
+              clientSecret = "";
+            }
+            const enabled = wrap.querySelector("[data-toggle]")?.checked ?? true;
+            try {
+              await api("/providers/" + provider, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled, custom: true, client_id: clientId, client_secret: clientSecret }),
+              });
+              showNotice("Custom credentials saved.");
+              loadProviders();
+            } catch (err) { showAlert(err.message); }
+          };
+        });
+        el.querySelectorAll("[data-client-secret]").forEach(input => {
+          if (input.dataset.secretSaved === "1") {
+            input.value = SECRET_MASK;
+          }
+          input.addEventListener("focus", () => {
+            if (input.dataset.secretSaved === "1" && input.value === SECRET_MASK) {
+              input.value = "";
+              input.dataset.editing = "1";
+              input.placeholder = "New secret (leave empty to keep current)";
+            }
+          });
+          input.addEventListener("blur", () => {
+            if (input.dataset.secretSaved === "1" && input.value === "") {
+              delete input.dataset.editing;
+              input.value = SECRET_MASK;
+              input.placeholder = "";
+            }
+          });
+        });
+        el.querySelectorAll("[data-use-platform]").forEach(btn => {
+          btn.onclick = async () => {
+            const wrap = btn.closest("[data-provider]");
+            const provider = wrap.dataset.provider;
+            const enabled = wrap.querySelector("[data-toggle]")?.checked ?? false;
+            try {
+              await api("/providers/" + provider, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled, use_platform: true }),
+              });
+              showNotice("Switched to platform OAuth.");
+              loadProviders();
+            } catch (err) { showAlert(err.message); }
+          };
+        });
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    async function loadProject() {
+      const el = document.getElementById("panel-project");
+      try {
+        const data = await api("/project");
+        el.innerHTML = `<div class="card"><h2>Project</h2><p class="desc">Auth rules for end users signing up through your app.</p>
+          <form id="project-form" style="max-width:480px">
+            <div class="field"><label>Name</label><input name="name" value="${escapeHtml(data.name || "")}"></div>
+            <label style="display:flex;align-items:center;gap:10px;margin:16px 0;font-size:.875rem;color:var(--muted)">
+              <input name="email_verify_required" type="checkbox" ${data.email_verify_required ? "checked" : ""} style="width:auto">
+              Require email verification for password sign-up
+            </label>
+            <div class="field"><label>Verification delivery</label>
+              <select name="email_verify_delivery">
+                <option value="link" ${data.email_verify_delivery === "link" ? "selected" : ""}>Email link only</option>
+                <option value="code" ${data.email_verify_delivery === "code" ? "selected" : ""}>6-digit code only</option>
+                <option value="both" ${data.email_verify_delivery === "both" ? "selected" : ""}>Link and code</option>
+              </select>
+              <p class="desc" style="margin-top:8px">Code verification uses <span class="mono">POST /auth/verify-code</span> with optional auto sign-in when <span class="mono">client_id</span> is sent.</p>
+            </div>
+            <div class="field"><label>Minimum password length</label><input name="password_min_length" type="number" min="8" max="128" value="${Number(data.password_min_length || 8)}"></div>
+            <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:.875rem;color:var(--muted)">
+              <input name="password_require_upper" type="checkbox" ${data.password_require_upper ? "checked" : ""} style="width:auto">
+              Require uppercase letter
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:.875rem;color:var(--muted)">
+              <input name="password_require_number" type="checkbox" ${data.password_require_number ? "checked" : ""} style="width:auto">
+              Require number
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:.875rem;color:var(--muted)">
+              <input name="password_require_special" type="checkbox" ${data.password_require_special ? "checked" : ""} style="width:auto">
+              Require special character
+            </label>
+            <p class="desc">Current rule: ${escapeHtml(data.password_hint || "at least 8 characters")}</p>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </form></div>`;
+        document.getElementById("project-form").onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          await api("/project", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+            name: fd.get("name"),
+            email_verify_required: fd.get("email_verify_required") === "on",
+            email_verify_delivery: fd.get("email_verify_delivery") || "link",
+            password_min_length: Number(fd.get("password_min_length") || 8),
+            password_require_upper: fd.get("password_require_upper") === "on",
+            password_require_number: fd.get("password_require_number") === "on",
+            password_require_special: fd.get("password_require_special") === "on",
+          })});
+          showNotice("Project settings saved.");
+          loadProject();
+        };
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    async function loadUsers() {
+      const el = document.getElementById("panel-users");
+      try {
+        const data = await api("/users");
+        if (!data?.users?.length) {
+           el.innerHTML = `<div class="card"><div class="empty">No app users yet. App users are the end users of your product, not dashboard accounts. Create a separate test account in your app to verify signup and email verification.</div></div>`;
+          return;
+        }
+        el.innerHTML = `<div class="card"><h2>${data.users.length} app users</h2>
+           <p class="desc">App users are end users who signed up through your product, not dashboard logins. For a test-account verification workflow, use a different email in your app, open the verification link or enter its 6-digit code, then refresh this list. Disabling blocks sign-in without deleting the account; Remove keeps its existing destructive behavior.</p>
+           <table><thead><tr><th>Email</th><th>Signed up with</th><th>Email verified</th><th>Status</th><th>Joined</th><th></th></tr></thead><tbody>${
+           data.users.map(u => `<tr>
+             <td>${escapeHtml(u.email)}</td>
+             <td>${escapeHtml(u.signup_method || "—")}</td>
+             <td>${u.email_verified ? "Yes" : "No"}</td>
+             <td>${u.disabled ? "Disabled" : "Active"}</td>
+             <td>${escapeHtml(formatWhen(u.created_at))}</td>
+             <td><div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+               ${!u.email_verified ? `<button class="btn" type="button" data-resend-user="${escapeHtml(u.id)}">Resend verification</button>` : ""}
+               <button class="btn" type="button" data-toggle-user="${escapeHtml(u.id)}" data-disabled="${u.disabled ? "1" : "0"}">${u.disabled ? "Enable" : "Disable"}</button>
+               <button class="btn" type="button" data-remove-user="${escapeHtml(u.id)}" data-email="${escapeHtml(u.email)}">Remove</button>
+             </div></td>
+           </tr>`).join("")
+         }</tbody></table></div>`;
+         el.querySelectorAll("[data-resend-user]").forEach(btn => btn.onclick = async () => {
+           btn.disabled = true;
+           try { await api("/users/" + btn.dataset.resendUser + "/resend-verification", { method: "POST" }); showNotice("Verification email sent."); }
+           catch (err) { showAlert(err.message); }
+           finally { btn.disabled = false; }
+         });
+         el.querySelectorAll("[data-toggle-user]").forEach(btn => btn.onclick = async () => {
+           const disabled = btn.dataset.disabled === "1";
+           try { await api("/users/" + btn.dataset.toggleUser + (disabled ? "/enable" : "/disable"), { method: "POST" }); showNotice(disabled ? "User enabled." : "User disabled."); loadUsers(); }
+           catch (err) { showAlert(err.message); }
+         });
+        el.querySelectorAll("[data-remove-user]").forEach(btn => btn.onclick = async () => {
+          const email = btn.dataset.email || "this user";
+          if (!confirm(`Remove ${email} from this project?`)) return;
+          await api("/users/" + btn.dataset.removeUser, { method: "DELETE" });
+          showNotice("User removed.");
+          loadUsers();
+        });
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    async function loadSessions() {
+      const el = document.getElementById("panel-sessions");
+      try {
+        const data = await api("/sessions");
+        if (!data?.sessions?.length) {
+          el.innerHTML = `<div class="card"><div class="empty">No active sessions.</div></div>`;
+          return;
+        }
+         el.innerHTML = `<div class="card"><h2>Active browser sessions</h2><p class="desc">Each row is a currently valid dashboard or app session. Revoke a row to invalidate it immediately; users can sign in again to create a new session.</p><table><thead><tr><th>User</th><th>IP</th><th>Expires</th><th></th></tr></thead><tbody>${
+          data.sessions.map(s => `<tr><td>${escapeHtml(s.email)}</td><td>${escapeHtml(s.ip || "—")}</td><td>${escapeHtml(s.expires_at)}</td><td><button class="btn" data-revoke="${s.id}">Revoke</button></td></tr>`).join("")
+        }</tbody></table></div>`;
+        el.querySelectorAll("[data-revoke]").forEach(btn => btn.onclick = async () => {
+          await api("/sessions/" + btn.dataset.revoke + "/revoke", { method: "POST" }); loadSessions();
+        });
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    async function loadTheme() {
+      const el = document.getElementById("panel-theme");
+      try {
+        const data = await api("/theme");
+        el.innerHTML = `<div class="card">
+          ${data.free_branding_locked ? `<div class="notice">Free plan keeps <strong>sooauth</strong> on login pages. Upgrade to customize branding.</div>` : ""}
+           <h2>Login page look</h2>
+           <p class="desc">These settings change the hosted sign-in, sign-up, verification, and reset pages for this project. They do not change the dashboard theme.</p>
+          <form id="theme-form" style="max-width:420px">
+            <div class="field"><label>Brand name</label><input name="brand_name" value="${escapeHtml(data.brand_name || "sooauth")}" ${!data.can_customize_brand ? "disabled" : ""}></div>
+            <div class="field"><label>Logo URL</label><input name="logo_url" value="${escapeHtml(data.logo_url || "")}" ${!data.can_customize_brand ? "disabled" : ""}></div>
+            <div class="field"><label>Accent color</label><input name="accent_color" value="${escapeHtml(data.accent_color || "#E8FF3F")}"></div>
+            <label style="display:flex;align-items:center;gap:10px;margin:16px 0;font-size:.875rem;color:var(--muted)">
+              <input name="hide_branding" type="checkbox" ${data.hide_branding ? "checked" : ""} ${!data.can_hide_branding ? "disabled" : ""} style="width:auto">
+              Hide &quot;Powered by sooauth&quot;
+            </label>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </form></div>`;
+        document.getElementById("theme-form").onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          await api("/theme", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(fd.entries())) });
+        };
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    async function loadBilling() {
+      const el = document.getElementById("panel-billing");
+      try {
+        const data = await api("/billing");
+        const fmtPrice = (quote) => {
+          if (!quote) return "Free";
+          const major = quote.currency === "TRY"
+            ? (quote.amount_cents / 100).toLocaleString("tr-TR")
+            : (quote.amount_cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+          return `${major} / ${quote.interval}`;
+        };
+        el.innerHTML = `
+          <div class="card">
+            <h2>Current plan</h2>
+            <p class="desc"><strong>${escapeHtml(data.plan_label)}</strong> · ${data.max_projects} project${data.max_projects === 1 ? "" : "s"} · status ${escapeHtml(data.status)}</p>
+            ${data.period_end ? `<p class="desc">Renews on ${escapeHtml(data.period_end)}</p>` : ""}
+            ${data.manual_upgrade_enabled ? `<div class="notice">Manual billing is enabled on this server — upgrades apply instantly without payment.</div>` : ""}
+          </div>
+          <div class="plan-grid">
+            ${data.plans.map(plan => {
+              const current = plan.id === data.plan;
+              const rank = { free: 1, pro: 2, business: 3 };
+              const canUpgrade = rank[plan.id] > rank[data.plan];
+              const paytr = data.providers.find(p => p.id === "paytr");
+              const stripe = data.providers.find(p => p.id === "stripe");
+              return `<article class="plan-card ${current ? "current" : ""}">
+                <h3>${escapeHtml(plan.label)}${current ? " · current" : ""}</h3>
+                <div class="plan-price">${escapeHtml(fmtPrice(plan.price_try || (plan.id === "free" ? null : plan.price_try)))}
+                  ${plan.price_try ? `<small>TR</small>` : ""}
+                </div>
+                ${plan.price_usd ? `<div class="desc">${escapeHtml(fmtPrice(plan.price_usd))} international</div>` : ""}
+                <ul class="plan-features">${plan.features.map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
+                <div class="plan-actions">
+                  ${current ? `<span class="badge">Active</span>` : canUpgrade ? `
+                    ${data.manual_upgrade_enabled ? `<button type="button" class="btn btn-primary" data-upgrade="${plan.id}" data-provider="manual">Upgrade now</button>` : ""}
+                    ${paytr?.available ? `<button type="button" class="btn" data-upgrade="${plan.id}" data-provider="paytr">Pay with PayTR</button>` : `<button type="button" class="btn" disabled title="Coming soon">PayTR (soon)</button>`}
+                    ${stripe?.available ? `<button type="button" class="btn" data-upgrade="${plan.id}" data-provider="stripe">Pay with Stripe</button>` : `<button type="button" class="btn" disabled title="Coming soon">Stripe (soon)</button>`}
+                  ` : `<span class="desc">Contact support to downgrade.</span>`}
+                </div>
+              </article>`;
+            }).join("")}
+          </div>`;
+        el.querySelectorAll("[data-upgrade]").forEach(btn => btn.onclick = async () => {
+          btn.disabled = true;
+          try {
+            const result = await api("/billing/upgrade", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+              body: JSON.stringify({ plan: btn.dataset.upgrade, provider: btn.dataset.provider }),
+            });
+            if (result?.status === "completed") {
+              showNotice(`Upgraded to ${result.plan_label || btn.dataset.upgrade}.`);
+              location.reload();
+              return;
+            }
+            showAlert(result?.message || "Online checkout is not enabled yet.");
+          } catch (err) {
+            showAlert(err.message);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    async function loadAudit() {
+      const el = document.getElementById("panel-audit");
+      try {
+        const data = await api("/audit");
+        if (!data?.entries?.length) {
+          el.innerHTML = `<div class="card"><div class="empty">No events yet.</div></div>`;
+          return;
+        }
+        el.innerHTML = `<div class="card"><table><thead><tr><th>Time</th><th>Action</th><th>IP</th></tr></thead><tbody>${
+          data.entries.map(e => `<tr><td>${escapeHtml(e.created_at)}</td><td>${escapeHtml(e.action)}</td><td>${escapeHtml(e.ip || "—")}</td></tr>`).join("")
+        }</tbody></table></div>`;
+      } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
+    }
+
+    function setupTheme() {
+      const root = document.documentElement;
+      const button = document.getElementById("theme-toggle");
+      const stored = localStorage.getItem("sooauth-dashboard-theme");
+      if (stored === "light" || stored === "dark") root.dataset.theme = stored;
+      const update = () => {
+        const dark = root.dataset.theme === "dark";
+        button.textContent = dark ? "Use light theme" : "Use dark theme";
+      };
+      update();
+      button.onclick = () => {
+        const next = root.dataset.theme === "dark" ? "light" : "dark";
+        root.dataset.theme = next;
+        localStorage.setItem("sooauth-dashboard-theme", next);
+        update();
+      };
+    }
+
+    async function boot() {
+      try {
+        setupTheme();
+        await refreshDashboard();
+        showTab(tabFromHash(), false);
+      } catch (err) { showAlert(err.message); }
+    }
+    boot();
+  </script>
+</body>
+</html>
