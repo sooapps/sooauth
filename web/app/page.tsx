@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, Bot, Check, Cpu, Database, KeyRound, Mail, Shield, Sparkles, Terminal } from "lucide-react";
+import { AlertTriangle, ArrowRight, Bot, Check, Cpu, Database, KeyRound, Mail, Shield, ShieldCheck, Terminal, X, Zap } from "lucide-react";
 import { SiteFooter } from "../components/site-footer";
 import { SiteHeader } from "../components/site-header";
-import { GridFigure } from "../components/ui/grid-figure";
+import { HeroAuthPreview } from "../components/hero-auth-preview";
 import { buttonClass } from "../components/ui/button";
 import {
   Card,
@@ -68,50 +68,81 @@ const features = [
   },
 ];
 
-const comparisonRows = [
+interface ComparisonCell {
+  status: "check" | "cross" | "warning" | "shield" | "zap" | "neutral";
+  text: string;
+}
+
+interface ComparisonRow {
+  feature: string;
+  sooauth: ComparisonCell;
+  clerk: ComparisonCell;
+  betterAuth: ComparisonCell;
+  keycloak: ComparisonCell;
+}
+
+const comparisonRows: ComparisonRow[] = [
   {
     feature: "Open-source & self-hostable",
-    sooauth: "✅ Yes (AGPL-3.0)",
-    clerk: "❌ Proprietary cloud only",
-    betterAuth: "✅ Yes (MIT)",
-    keycloak: "✅ Yes (Apache 2.0)",
+    sooauth: { status: "check", text: "Yes (AGPL-3.0)" },
+    clerk: { status: "cross", text: "Proprietary cloud only" },
+    betterAuth: { status: "check", text: "Yes (MIT)" },
+    keycloak: { status: "check", text: "Yes (Apache 2.0)" },
   },
   {
     feature: "Modifies your app's database?",
-    sooauth: "🛡️ Zero DB migrations",
-    clerk: "🛡️ None",
-    betterAuth: "⚠️ Requires DB tables & schemas",
-    keycloak: "🛡️ None",
+    sooauth: { status: "shield", text: "Zero DB migrations" },
+    clerk: { status: "shield", text: "None" },
+    betterAuth: { status: "warning", text: "Requires DB tables & schemas" },
+    keycloak: { status: "shield", text: "None" },
   },
   {
     feature: "Protocol compliance",
-    sooauth: "✅ Standard OIDC + PKCE",
-    clerk: "❌ Proprietary SDK",
-    betterAuth: "❌ Custom protocol",
-    keycloak: "✅ Standard OIDC & SAML",
+    sooauth: { status: "check", text: "Standard OIDC + PKCE" },
+    clerk: { status: "cross", text: "Proprietary SDK" },
+    betterAuth: { status: "cross", text: "Custom protocol" },
+    keycloak: { status: "check", text: "Standard OIDC & SAML" },
   },
   {
     feature: "Memory footprint",
-    sooauth: "⚡ Minimal (~25MB Go binary)",
-    clerk: "Cloud only",
-    betterAuth: "Node.js runtime",
-    keycloak: "🐘 Heavy (Java 1GB+ RAM)",
+    sooauth: { status: "zap", text: "Minimal (~25MB Go binary)" },
+    clerk: { status: "neutral", text: "Cloud only" },
+    betterAuth: { status: "neutral", text: "Node.js runtime" },
+    keycloak: { status: "cross", text: "Heavy (Java 1GB+ RAM)" },
   },
   {
     feature: "MAU pricing tax",
-    sooauth: "✅ Free self-host / flat",
-    clerk: "❌ $0.02+/MAU spike",
-    betterAuth: "✅ Free self-host",
-    keycloak: "✅ Free self-host",
+    sooauth: { status: "check", text: "Free self-host / flat" },
+    clerk: { status: "cross", text: "$0.02+/MAU spike" },
+    betterAuth: { status: "check", text: "Free self-host" },
+    keycloak: { status: "check", text: "Free self-host" },
   },
   {
     feature: "Prompt-ready for AI agents",
-    sooauth: "✨ 1 prompt (standard OIDC)",
-    clerk: "⚠️ Vendor SDK methods",
-    betterAuth: "⚠️ ORM migration bugs",
-    keycloak: "❌ Complex enterprise setup",
+    sooauth: { status: "zap", text: "1 prompt (standard OIDC)" },
+    clerk: { status: "warning", text: "Vendor SDK methods" },
+    betterAuth: { status: "warning", text: "ORM migration bugs" },
+    keycloak: { status: "cross", text: "Complex enterprise setup" },
   },
 ];
+
+function CellBadge({ cell, isPrimary = false }: { cell: ComparisonCell; isPrimary?: boolean }) {
+  const icon = {
+    check: <Check size={14} className="text-lime-400 shrink-0" />,
+    cross: <X size={14} className="text-red-400/90 shrink-0" />,
+    warning: <AlertTriangle size={14} className="text-amber-400 shrink-0" />,
+    shield: <ShieldCheck size={14} className="text-lime-400 shrink-0" />,
+    zap: <Zap size={14} className="text-lime-400 shrink-0" />,
+    neutral: null,
+  }[cell.status];
+
+  return (
+    <span className={`inline-flex items-center gap-2 ${isPrimary ? "font-semibold text-fg" : "text-fg-muted"}`}>
+      {icon}
+      <span>{cell.text}</span>
+    </span>
+  );
+}
 
 export default function Page() {
   const featuredArticles = blogPosts.slice(0, 3);
@@ -129,8 +160,8 @@ export default function Page() {
         <Container>
           <div className="grid gap-12 py-[clamp(3.5rem,7vw,6.5rem)] lg:grid-cols-12 lg:items-center lg:gap-8">
             <div className="lg:col-span-7">
-              <Eyebrow className="rise rise-1 inline-flex items-center gap-1.5">
-                <Sparkles size={14} className="text-fg" aria-hidden />
+              <Eyebrow className="rise rise-1 inline-flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-lime-400 animate-pulse" aria-hidden />
                 Open-source auth for vibecoders & indie SaaS
               </Eyebrow>
               <h1 className="rise rise-2 mt-5 font-sans text-[clamp(2.5rem,5vw,4rem)] font-bold leading-[1.04] tracking-[-0.03em] text-fg">
@@ -160,7 +191,7 @@ export default function Page() {
               </div>
             </div>
             <div className="rise rise-4 lg:col-span-5">
-              <GridFigure />
+              <HeroAuthPreview />
             </div>
           </div>
         </Container>
@@ -323,12 +354,18 @@ curl -sSL https://raw.githubusercontent.com/sooapps/sooauth/main/install.sh | ba
                 {comparisonRows.map((row) => (
                   <tr key={row.feature} className="hover:bg-bg-subtle/50 transition-colors">
                     <td className="p-4 md:p-5 font-medium text-fg">{row.feature}</td>
-                    <td className="p-4 md:p-5 font-semibold text-fg bg-bg-subtle/40 border-l border-r border-line">
-                      {row.sooauth}
+                    <td className="p-4 md:p-5 bg-bg-subtle/40 border-l border-r border-line">
+                      <CellBadge cell={row.sooauth} isPrimary />
                     </td>
-                    <td className="p-4 md:p-5 text-fg-muted">{row.clerk}</td>
-                    <td className="p-4 md:p-5 text-fg-muted">{row.betterAuth}</td>
-                    <td className="p-4 md:p-5 text-fg-muted">{row.keycloak}</td>
+                    <td className="p-4 md:p-5">
+                      <CellBadge cell={row.clerk} />
+                    </td>
+                    <td className="p-4 md:p-5">
+                      <CellBadge cell={row.betterAuth} />
+                    </td>
+                    <td className="p-4 md:p-5">
+                      <CellBadge cell={row.keycloak} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
