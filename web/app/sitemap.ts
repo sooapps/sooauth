@@ -15,6 +15,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/docs/self-host",
     "/blog",
     "/compare/auth0",
+    "/compare/better-auth",
     "/compare/clerk",
   ];
 

@@ -51,8 +51,14 @@ export const metadata: Metadata = {
   publisher: "Sooapps",
   category: "Developer tools",
   icons: {
-    icon: "/sooauth-light.png",
-    apple: "/sooauth-light.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   robots: { index: true, follow: true },
   alternates: { canonical: "/" },
