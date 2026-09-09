@@ -4,7 +4,8 @@ import { DocsNav } from "../../components/docs-nav";
 import { buttonClass } from "../../components/ui/button";
 import { Eyebrow } from "../../components/ui/layout";
 import { ThemeToggle } from "../../components/ui/theme-toggle";
-import { adminUrl, siteName, signInUrl } from "../../lib/site";
+import { BrandLogo } from "../../components/brand-logo";
+import { adminUrl, signInUrl } from "../../lib/site";
 
 export default function DocsLayout({ children }: { children: ReactNode }) {
   return (
@@ -13,9 +14,9 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
         <div className="container-swiss flex h-16 items-center justify-between gap-4">
           <Link
             href="/"
-            className="font-wordmark text-[18px] font-bold tracking-[-0.03em] text-fg"
+            className="text-fg"
           >
-            {siteName}
+            <BrandLogo />
           </Link>
           <nav aria-label="Docs header" className="flex items-center gap-2">
             <Link href={adminUrl} className={buttonClass("ghost", "sm")}>
