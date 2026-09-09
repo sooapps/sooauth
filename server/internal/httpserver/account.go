@@ -223,8 +223,29 @@ func (s *Server) handleAccountMFAQRCode(w http.ResponseWriter, r *http.Request) 
 	_, _ = w.Write(png)
 }
 
+func (s *Server) handleAccountPasswordStatus(w http.ResponseWriter, r *http.Request) {
+	setPublicCORS(w, r)
+	if corsPreflight(w, r) {
+		return
+	}
+	user, ok := s.requireAuthUser(w, r)
+	if !ok {
+		return
+	}
+	hasPass, err := s.users.HasPasswordCredential(r.Context(), user.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "check_password_failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"has_password": hasPass})
+}
+
 func (s *Server) handleAccountChangePassword(w http.ResponseWriter, r *http.Request) {
-	user, ok := s.accountUser(w, r)
+	setPublicCORS(w, r)
+	if corsPreflight(w, r) {
+		return
+	}
+	user, ok := s.requireAuthUser(w, r)
 	if !ok {
 		return
 	}
@@ -236,31 +257,115 @@ func (s *Server) handleAccountChangePassword(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
 		return
 	}
+
+	hasPass, err := s.users.HasPasswordCredential(r.Context(), user.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "check_password_failed"})
+		return
+	}
+	if !hasPass {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "no_password_set", "message": "User does not have a password set. Use set password instead."})
+		return
+	}
+
 	valid, err := s.users.VerifyPassword(r.Context(), user.ID, body.CurrentPassword)
 	if err != nil || !valid {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_current_password"})
 		return
 	}
 	if err := passwordpolicy.Default().Validate(body.NewPassword); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "weak_password"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "weak_password", "message": err.Error()})
 		return
 	}
 	if err := s.users.UpdatePassword(r.Context(), user.ID, body.NewPassword); err != nil {
 		if errors.Is(err, passwordpolicy.ErrWeak) || strings.Contains(err.Error(), "at least") {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "weak_password"})
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "weak_password", "message": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "password_change_failed"})
 		return
 	}
-	if err := s.sessions.RevokeAllForUser(r.Context(), user.ID); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "sessions_revoke_failed"})
-		return
+
+	currentSessID := uuid.Nil
+	if raw := cookieValue(r, sessionCookie); raw != "" {
+		if current, _ := s.sessions.FindByTokenHash(r.Context(), token.Hash(raw)); current != nil {
+			currentSessID = current.ID
+		}
 	}
-	if err := s.refresh.RevokeAllForUser(r.Context(), user.ID); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "refresh_tokens_revoke_failed"})
-		return
+	if currentSessID != uuid.Nil {
+		_ = s.sessions.RevokeOthersForUser(r.Context(), user.ID, currentSessID)
+	} else {
+		_ = s.sessions.RevokeAllForUser(r.Context(), user.ID)
 	}
-	clearAuthCookies(w, s.cfg.CookieSecure, s.cfg.CookieDomain)
+	_ = s.refresh.RevokeAllForUser(r.Context(), user.ID)
+
+	auditMeta := map[string]any{"email": user.Email}
+	if user.TenantID != nil {
+		auditMeta["tenant_id"] = user.TenantID.String()
+	}
+	s.audit.Log(r.Context(), &user.ID, "password_changed", auditMeta, clientIP(r))
+
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password_changed"})
+}
+
+func (s *Server) handleAccountSetPassword(w http.ResponseWriter, r *http.Request) {
+	setPublicCORS(w, r)
+	if corsPreflight(w, r) {
+		return
+	}
+	user, ok := s.requireAuthUser(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+
+	hasPass, err := s.users.HasPasswordCredential(r.Context(), user.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "check_password_failed"})
+		return
+	}
+	if hasPass {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "password_already_set", "message": "User already has a password. Use change password instead."})
+		return
+	}
+
+	if err := passwordpolicy.Default().Validate(body.NewPassword); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "weak_password", "message": err.Error()})
+		return
+	}
+	if err := s.users.UpdatePassword(r.Context(), user.ID, body.NewPassword); err != nil {
+		if errors.Is(err, passwordpolicy.ErrWeak) || strings.Contains(err.Error(), "at least") {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "weak_password", "message": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "password_set_failed"})
+		return
+	}
+
+	currentSessID := uuid.Nil
+	if raw := cookieValue(r, sessionCookie); raw != "" {
+		if current, _ := s.sessions.FindByTokenHash(r.Context(), token.Hash(raw)); current != nil {
+			currentSessID = current.ID
+		}
+	}
+	if currentSessID != uuid.Nil {
+		_ = s.sessions.RevokeOthersForUser(r.Context(), user.ID, currentSessID)
+	} else {
+		_ = s.sessions.RevokeAllForUser(r.Context(), user.ID)
+	}
+	_ = s.refresh.RevokeAllForUser(r.Context(), user.ID)
+
+	auditMeta := map[string]any{"email": user.Email}
+	if user.TenantID != nil {
+		auditMeta["tenant_id"] = user.TenantID.String()
+	}
+	s.audit.Log(r.Context(), &user.ID, "password_set", auditMeta, clientIP(r))
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "password_set"})
 }

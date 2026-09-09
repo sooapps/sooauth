@@ -321,6 +321,18 @@ func (s *Server) handleMFAVerify(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) requireAuthUser(w http.ResponseWriter, r *http.Request) (*store.User, bool) {
+	user, err := s.currentUser(r)
+	if err != nil || user == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthenticated"})
+		return nil, false
+	}
+	if !accountCSRFValid(w, r) {
+		return nil, false
+	}
+	return user, true
+}
+
 func (s *Server) requirePlatformUser(w http.ResponseWriter, r *http.Request) (*store.User, bool) {
 	user, err := s.currentUser(r)
 	if err != nil || user == nil {

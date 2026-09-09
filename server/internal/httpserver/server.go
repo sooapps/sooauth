@@ -227,7 +227,11 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("GET /auth/account/identities/{provider}/link", s.handleAccountLinkIdentity)
 	mux.HandleFunc("GET /auth/account/mfa", s.handleAccountMFA)
 	mux.HandleFunc("GET /auth/account/mfa/qr", s.handleAccountMFAQRCode)
+	mux.HandleFunc("GET /auth/account/password", s.handleAccountPasswordStatus)
+	mux.HandleFunc("OPTIONS /auth/account/password", s.handlePublicCORS)
 	mux.HandleFunc("PUT /auth/account/password", s.handleAccountChangePassword)
+	mux.HandleFunc("POST /auth/account/password/set", s.handleAccountSetPassword)
+	mux.HandleFunc("OPTIONS /auth/account/password/set", s.handlePublicCORS)
 
 	mux.HandleFunc("GET /auth/sign-in", s.handlePageSignIn)
 	mux.HandleFunc("GET /auth/sign-up", s.handlePageSignUp)

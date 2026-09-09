@@ -4,8 +4,8 @@ import "net/http"
 
 func setPublicCORS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Sooauth-Embed")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Sooauth-Embed, X-CSRF-Token")
 }
 
 func (s *Server) handlePublicCORS(w http.ResponseWriter, r *http.Request) {

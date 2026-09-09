@@ -6,6 +6,9 @@ type ClientLike = {
   getUserInfo: (accessToken?: string) => Promise<unknown>;
   signInWithRedirect: (state?: string, nonce?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  getPasswordStatus?: (accessToken?: string) => Promise<{ has_password: boolean }>;
+  changePassword?: (currentPassword: string, newPassword: string, accessToken?: string) => Promise<{ message: string }>;
+  setPassword?: (newPassword: string, accessToken?: string) => Promise<{ message: string }>;
 };
 
 export function useSession(client: ClientLike) {
@@ -44,6 +47,21 @@ export function useSession(client: ClientLike) {
       setSession(null);
       setUser(null);
     },
+    getPasswordStatus: async () => {
+      if (!client.getPasswordStatus) throw new Error("getPasswordStatus_not_supported");
+      return client.getPasswordStatus(session?.accessToken);
+    },
+    changePassword: async (currentPassword: string, newPassword: string) => {
+      if (!client.changePassword) throw new Error("changePassword_not_supported");
+      return client.changePassword(currentPassword, newPassword, session?.accessToken);
+    },
+    setPassword: async (newPassword: string) => {
+      if (!client.setPassword) throw new Error("setPassword_not_supported");
+      return client.setPassword(newPassword, session?.accessToken);
+    },
     refresh,
   };
 }
+
+export * from "./PasswordModal.js";
+

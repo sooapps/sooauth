@@ -60,6 +60,52 @@ export function Profile() {
 }
 ```
 
+## In-App Password Management & React Modal
+
+Support users changing their password, or setting a password for the first time if they signed up via Google or GitHub OAuth.
+
+### Using the Drop-in React Modal
+
+```tsx
+import { useState } from "react";
+import { PasswordModal, useSession } from "@sooauth/sdk-js/react";
+import { auth } from "./auth";
+
+export function AccountSettings() {
+  const [open, setOpen] = useState(false);
+  const { session } = useSession(auth);
+
+  return (
+    <div>
+      <button onClick={() => setOpen(true)}>Manage Password</button>
+      <PasswordModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        client={auth}
+        onSuccess={(type) => console.log(`Password ${type} successfully!`)}
+      />
+    </div>
+  );
+}
+```
+
+### Direct SDK Methods
+
+```typescript
+// 1. Check if user has an existing password (false for social logins)
+const { has_password } = await auth.getPasswordStatus();
+
+// 2. Set password for social login users
+if (!has_password) {
+  await auth.setPassword("myNewPassword123!");
+}
+
+// 3. Change password for users who already have one
+if (has_password) {
+  await auth.changePassword("currentPassword123!", "newPassword456!");
+}
+```
+
 ## License
 
 AGPL-3.0-or-later. Built with care by [Sooapps](https://sooapps.com).

@@ -24,6 +24,9 @@ PKCE by hand.
 | POST | `/auth/sign-in` | Sign in with email and password |
 | POST | `/auth/sign-out` | Revoke the current cookie session |
 | GET | `/auth/me` | Read the current account |
+| GET | `/auth/account/password` | Check whether current account has a password |
+| PUT | `/auth/account/password` | Change existing account password |
+| POST | `/auth/account/password/set` | Set password for social-only login users |
 | POST | `/auth/forgot-password` | Start a password reset (link or 6-digit code) |
 | POST | `/auth/reset-password` | Complete a password reset with token or code |
 | POST | `/auth/resend-verification` | Resend email verification |
@@ -76,19 +79,68 @@ Response:
 }
 ```
 
-**Option B: Reset via 6-Digit Code (In-App / Widget / Mobile):**
+**Option B: Reset Password with 6-Digit OTP Code**
+
+`POST /auth/reset-password`
+
 ```json
 {
   "email": "user@example.com",
-  "code": "123456",
-  "password": "newSecurePassword123!",
-  "client_id": "app_your_client_id"
+  "code": "583920",
+  "password": "brand-new-secure-password"
 }
 ```
 
 On success, existing sessions and refresh tokens for that user are revoked, and `{"message": "Password updated. Sign in with your new password."}` is returned.
 
-## Passkeys and MFA
+## In-App Password Management (Change / Set Password)
+
+Authenticated users (both tenant application users via Bearer token and platform administrators via session cookies) can manage their credentials from within their app or security settings.
+
+### Check Password Status
+
+`GET /auth/account/password`
+
+Header: `Authorization: Bearer <access_token>`
+
+Response:
+```json
+{
+  "has_password": true
+}
+```
+If `has_password` is `false`, the user signed up via a social provider (Google, GitHub) and does not have a local password yet.
+
+### Set Password (Social Login Users)
+
+`POST /auth/account/password/set`
+
+Header: `Authorization: Bearer <access_token>`
+
+```json
+{
+  "new_password": "new-strong-password-123"
+}
+```
+* Fails with `400` (`password_already_set`) if the user already has a password hash established.
+* Revokes other active sessions and logs a `password_set` audit event.
+
+### Change Password
+
+`PUT /auth/account/password`
+
+Header: `Authorization: Bearer <access_token>`
+
+```json
+{
+  "current_password": "current-password-123",
+  "new_password": "new-strong-password-456"
+}
+```
+* Validates `current_password` and checks `new_password` against policy (minimum 8 characters).
+* Revokes other active sessions and logs a `password_changed` audit event.
+
+## Multi-Factor Authentication (MFA)
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |

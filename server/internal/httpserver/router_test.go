@@ -41,3 +41,26 @@ func TestForgotPasswordAndResetPasswordCORS(t *testing.T) {
 		t.Fatalf("expected CORS header on OPTIONS /auth/reset-password, got %q", w.Header().Get("Access-Control-Allow-Origin"))
 	}
 }
+
+func TestAccountPasswordCORS(t *testing.T) {
+	s := &Server{cfg: config.Config{AppURL: "http://localhost:8080"}}
+	router := s.Router()
+
+	req := httptest.NewRequest("OPTIONS", "/auth/account/password", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("expected CORS header on OPTIONS /auth/account/password, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+	methods := w.Header().Get("Access-Control-Allow-Methods")
+	if methods == "" {
+		t.Fatal("expected Access-Control-Allow-Methods header")
+	}
+
+	req = httptest.NewRequest("OPTIONS", "/auth/account/password/set", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("expected CORS header on OPTIONS /auth/account/password/set, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
