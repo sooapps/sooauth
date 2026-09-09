@@ -102,11 +102,13 @@ func (s *Server) handlePageSignUp(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePageForgotPassword(w http.ResponseWriter, r *http.Request) {
 	data := s.pageData("Reset password", r)
+	data.ClientID = ""
+	data.ReturnTo = ""
 	clientID := strings.TrimSpace(r.URL.Query().Get("client_id"))
 	returnTo := strings.TrimSpace(r.URL.Query().Get("return_to"))
 	if clientID != "" {
-		data.ClientID = clientID
 		if client, _ := s.oauthClients.FindByClientID(r.Context(), clientID); client != nil && client.TenantID != nil {
+			data.ClientID = clientID
 			if tenant, _ := s.tenants.FindByID(r.Context(), *client.TenantID); tenant != nil {
 				theme, _ := s.theme.GetByTenant(r.Context(), *client.TenantID)
 				data.BrandName = appDisplayBrand(tenant, theme, client)
@@ -120,11 +122,13 @@ func (s *Server) handlePageForgotPassword(w http.ResponseWriter, r *http.Request
 func (s *Server) handlePageResetPassword(w http.ResponseWriter, r *http.Request) {
 	data := s.pageData("New password", r)
 	data.Token = r.URL.Query().Get("token")
+	data.ClientID = ""
+	data.ReturnTo = ""
 	clientID := strings.TrimSpace(r.URL.Query().Get("client_id"))
 	returnTo := strings.TrimSpace(r.URL.Query().Get("return_to"))
 	if clientID != "" {
-		data.ClientID = clientID
 		if client, _ := s.oauthClients.FindByClientID(r.Context(), clientID); client != nil && client.TenantID != nil {
+			data.ClientID = clientID
 			if tenant, _ := s.tenants.FindByID(r.Context(), *client.TenantID); tenant != nil {
 				theme, _ := s.theme.GetByTenant(r.Context(), *client.TenantID)
 				data.BrandName = appDisplayBrand(tenant, theme, client)
