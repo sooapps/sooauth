@@ -36,6 +36,27 @@ Mutating browser requests that use cookies require the `X-CSRF-Token` header.
 Public app endpoints use `client_id` to select a project. Never put provider
 secrets in an application; social provider credentials belong in the dashboard.
 
+### Sign In & Remember Me
+
+`POST /auth/sign-in`
+
+```json
+{
+  "email": "user@example.com",
+  "password": "yourPassword123!",
+  "client_id": "app_your_client_id",
+  "remember_me": true
+}
+```
+
+* `email` *(required)*: User's email address.
+* `password` *(required)*: User's password.
+* `client_id` *(optional)*: Scopes authentication to a specific tenant application.
+* `remember_me` *(optional, default: `true`)*:
+  * When `true`: Sets persistent session and CSRF cookies (`Max-Age: 30 days`), and 30-day session and refresh tokens.
+  * When `false`: Sets transient browser session cookies (omitting `Max-Age` / `Expires`, expiring on browser close), and 24-hour session and refresh tokens.
+
+
 ## Password Reset (Forgot Password)
 
 Password reset supports both tenant-scoped users and platform administrators.

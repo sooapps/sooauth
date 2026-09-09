@@ -128,6 +128,27 @@ input:focus {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--fg) 15%, transparent);
 }
 
+label.checkbox-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+}
+
+label.checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
 button, .btn {
   display: inline-flex;
   justify-content: center;

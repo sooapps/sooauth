@@ -30,8 +30,15 @@ func NewSessions(db *pgxpool.Pool) *Sessions {
 }
 
 func (s *Sessions) Create(ctx context.Context, userID uuid.UUID, tokenHash, ip, userAgent string) (*Session, error) {
+	return s.CreateWithTTL(ctx, userID, tokenHash, ip, userAgent, sessionTTL)
+}
+
+func (s *Sessions) CreateWithTTL(ctx context.Context, userID uuid.UUID, tokenHash, ip, userAgent string, ttl time.Duration) (*Session, error) {
+	if ttl <= 0 {
+		ttl = sessionTTL
+	}
 	id := uuid.New()
-	expires := time.Now().UTC().Add(sessionTTL)
+	expires := time.Now().UTC().Add(ttl)
 	_, err := s.db.Exec(ctx, `
 		INSERT INTO sessions (id, user_id, token_hash, expires_at, ip, user_agent, created_at)
 		VALUES ($1, $2, $3, $4, NULLIF($5, '')::inet, NULLIF($6, ''), now())

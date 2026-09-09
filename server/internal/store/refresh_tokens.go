@@ -30,8 +30,15 @@ func NewRefreshTokens(db *pgxpool.Pool) *RefreshTokens {
 }
 
 func (s *RefreshTokens) Issue(ctx context.Context, userID, familyID uuid.UUID, tokenHash string) (uuid.UUID, error) {
+	return s.IssueWithTTL(ctx, userID, familyID, tokenHash, refreshTTL)
+}
+
+func (s *RefreshTokens) IssueWithTTL(ctx context.Context, userID, familyID uuid.UUID, tokenHash string, ttl time.Duration) (uuid.UUID, error) {
+	if ttl <= 0 {
+		ttl = refreshTTL
+	}
 	id := uuid.New()
-	expires := time.Now().UTC().Add(refreshTTL)
+	expires := time.Now().UTC().Add(ttl)
 	_, err := s.db.Exec(ctx, `
 		INSERT INTO refresh_tokens (id, user_id, family_id, token_hash, expires_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, now())

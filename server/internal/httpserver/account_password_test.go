@@ -98,14 +98,18 @@ func setupTestServer(t *testing.T) (*Server, *pgxpool.Pool, *appjwt.Issuer) {
 	)
 
 	s := &Server{
-		cfg:      cfg,
-		db:       db,
-		jwt:      jwtIssuer,
-		auth:     authSvc,
-		users:    users,
-		sessions: sessions,
-		refresh:  refresh,
-		audit:    audit,
+		cfg:          cfg,
+		db:           db,
+		jwt:          jwtIssuer,
+		auth:         authSvc,
+		users:        users,
+		sessions:     sessions,
+		refresh:      refresh,
+		audit:        audit,
+		tenants:      store.NewTenants(db),
+		oauthClients: store.NewOAuthClients(db),
+		theme:        store.NewThemeStore(db),
+		accounts:     store.NewAccounts(db),
 	}
 
 	return s, db, jwtIssuer
