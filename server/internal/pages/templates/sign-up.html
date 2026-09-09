@@ -6,7 +6,7 @@
   {{if .SocialProviders}}
   <div class="social">
     {{range .SocialProviders}}
-    <a class="btn secondary" href="/auth/social/{{.}}/start?return_to={{$.ReturnTo}}{{if $.TenantID}}&amp;tenant_id={{$.TenantID}}{{end}}{{if $.ClientID}}&amp;client_id={{$.ClientID}}{{end}}">Continue with {{providerLabel .}}</a>
+    <a class="btn secondary" href="/auth/social/{{.}}/start?return_to={{$.ReturnTo | urlquery}}{{if $.TenantID}}&amp;tenant_id={{$.TenantID | urlquery}}{{end}}{{if $.ClientID}}&amp;client_id={{$.ClientID | urlquery}}{{end}}">Continue with {{providerLabel .}}</a>
     {{end}}
   </div>
   <div class="divider">or email</div>
@@ -16,6 +16,6 @@
     <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" required /></label>
     <button type="submit">Sign up</button>
   </form>
-  <div class="links"><a href="/auth/sign-in">Already have an account?</a></div>
+  <div class="links"><a href="/auth/sign-in{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">Already have an account?</a></div>
 </section>
 {{end}}
