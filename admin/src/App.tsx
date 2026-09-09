@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./styles.css";
 
-type Tab = "overview" | "integration" | "providers" | "project" | "users" | "sessions" | "theme" | "billing" | "audit" | "webhooks";
+type Tab = "overview" | "integration" | "providers" | "project" | "users" | "sessions" | "theme" | "email" | "billing" | "audit" | "webhooks";
 type Data = Record<string, any>;
 type AppTheme = "light" | "dark" | "system";
 
@@ -14,6 +14,7 @@ const tabs: { id: Tab; label: string; group: string }[] = [
   { id: "users", label: "Users", group: "Workspace" },
   { id: "sessions", label: "Sessions", group: "Workspace" },
   { id: "theme", label: "Theme", group: "Configuration" },
+  { id: "email", label: "Email", group: "Configuration" },
   { id: "billing", label: "Billing", group: "Configuration" },
   { id: "audit", label: "Audit", group: "Configuration" },
   { id: "webhooks", label: "Webhooks", group: "Configuration" },
@@ -48,8 +49,8 @@ function Card({ title, description, children, className = "" }: { title?: string
   return <section className={`card ${className}`}>{title && <div className="card-heading"><div><h2>{title}</h2>{description && <p>{description}</p>}</div></div>}{children}</section>;
 }
 
-function Field({ label, value, onChange, type = "text", disabled = false }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; disabled?: boolean }) {
-  return <label className="field"><span>{label}</span><input disabled={disabled} type={type} value={value} onChange={(e) => onChange(e.target.value)} /></label>;
+function Field({ label, value, onChange, type = "text", disabled = false, placeholder }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; disabled?: boolean; placeholder?: string }) {
+  return <label className="field"><span>{label}</span><input disabled={disabled} type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} /></label>;
 }
 
 function Integration({ notify }: { notify: (message: string) => void }) {
@@ -141,8 +142,257 @@ export function App() {
   useEffect(() => { request("/me").then(setMe).catch((e) => notify(e.message)); }, []);
   useEffect(() => { history.replaceState(null, "", `/dashboard/#${tab}`); }, [tab]);
   const title = tabs.find((item) => item.id === tab)?.label || "Dashboard";
-  const page = tab === "integration" ? <Integration notify={notify} /> : tab === "providers" ? <Providers notify={notify} /> : tab === "overview" ? <Overview /> : ["users", "sessions", "audit", "webhooks"].includes(tab) ? <ResourcePage tab={tab} notify={notify} /> : ["project", "theme", "billing"].includes(tab) ? <Settings tab={tab as "project" | "theme" | "billing"} notify={notify} /> : null;
+  const page = tab === "integration" ? <Integration notify={notify} /> : tab === "providers" ? <Providers notify={notify} /> : tab === "overview" ? <Overview /> : tab === "email" ? <EmailSettings notify={notify} /> : ["users", "sessions", "audit", "webhooks"].includes(tab) ? <ResourcePage tab={tab} notify={notify} /> : ["project", "theme", "billing"].includes(tab) ? <Settings tab={tab as "project" | "theme" | "billing"} notify={notify} /> : null;
   const switchProject = async (id: string) => { try { await request(`/projects/${id}/select`, { method: "POST" }); location.reload(); } catch (e) { notify((e as Error).message); } };
   const createProject = async () => { const name = window.prompt("Project name"); if (!name?.trim()) return; try { await request("/projects", { method: "POST", body: JSON.stringify({ name: name.trim() }) }); location.reload(); } catch (e) { notify((e as Error).message); } };
   return <div className="app"><aside className="sidebar"><a className="brand" href="https://sooauth.com"><img className="brand-logo brand-logo-light" src="/sooauth-light.png" alt="sooauth" /><img className="brand-logo brand-logo-dark" src="/sooauth-dark.png" alt="" /><span>sooauth</span></a>{me?.projects?.length ? <div className="sidebar-project"><label className="project-picker"><span>Current project</span><div className="project-select-wrap"><select className="project-select" value={me.project?.id || ""} onChange={(e) => switchProject(e.target.value)} aria-label="Current project">{me.projects.map((project: Data) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></div></label><Button primary onClick={createProject}>+ New project</Button></div> : null}<nav>{["Workspace", "Configuration"].map((group) => <div className="nav-group" key={group}><small>{group}</small>{tabs.filter((item) => item.group === group).map((item) => <button className={tab === item.id ? "active" : ""} key={item.id} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>)}</nav><div className="sidebar-links"><a href="https://sooauth.com/docs">Documentation ↗</a><a href="https://sooauth.com/docs/integrate-oidc#ai-prompt">AI setup prompt ↗</a><a href="/auth/account">Security Center ↗</a></div><div className="profile"><div className="profile-identity"><span className="avatar">{(me?.email || "?").slice(0, 1).toUpperCase()}</span><strong>{me?.email || "Loading account…"}</strong></div><button onClick={() => { fetch(`${API}/auth/sign-out`, { method: "POST", credentials: "include", headers: { "X-CSRF-Token": decodeURIComponent(csrf()) } }).then(() => { location.href = "/auth/sign-in"; }); }}>Sign out</button></div></aside><main><header className="topbar"><div><p className="eyebrow">Workspace</p><h1>{title}{me?.project?.name ? <span> · {me.project.name}</span> : null}</h1></div><ThemeControl theme={theme} onChange={changeTheme} /></header>{notice && <div className="toast">{notice}</div>}<div className="content">{page}</div></main></div>;
+}
+
+function EmailSettings({ notify }: { notify: (message: string) => void }) {
+  const [data, setData] = useState<Data | null>(null);
+  const [draft, setDraft] = useState<Data>({});
+  const [testing, setTesting] = useState(false);
+  const [testTo, setTestTo] = useState("");
+
+  const load = () => {
+    request("/email")
+      .then((val) => {
+        setData(val);
+        setDraft(val);
+      })
+      .catch((e) => notify(e.message));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  if (!data) return <Loading />;
+
+  const provider = draft.provider || "smtp";
+
+  const save = async () => {
+    try {
+      await request("/email", {
+        method: "PUT",
+        body: JSON.stringify({
+          enabled: Boolean(draft.enabled),
+          provider: draft.provider || "smtp",
+          from_name: draft.from_name || "",
+          from_email: draft.from_email || "",
+          reply_to: draft.reply_to || "",
+          smtp_host: draft.smtp_host || "",
+          smtp_port: Number(draft.smtp_port || 587),
+          smtp_user: draft.smtp_user || "",
+          smtp_password: draft.smtp_password || undefined,
+          smtp_tls_mode: draft.smtp_tls_mode || "starttls",
+          api_key: draft.api_key || undefined,
+          aws_access_key_id: draft.aws_access_key_id || "",
+          aws_secret_key: draft.aws_secret_key || undefined,
+          aws_region: draft.aws_region || "us-east-1",
+        }),
+      });
+      notify("Email settings saved.");
+      load();
+    } catch (e) {
+      notify((e as Error).message);
+    }
+  };
+
+  const sendTest = async () => {
+    setTesting(true);
+    try {
+      const res = await request("/email/test", {
+        method: "POST",
+        body: JSON.stringify({
+          to: testTo.trim() || undefined,
+          provider: draft.provider || "smtp",
+          from_name: draft.from_name || "",
+          from_email: draft.from_email || "",
+          reply_to: draft.reply_to || "",
+          smtp_host: draft.smtp_host || "",
+          smtp_port: Number(draft.smtp_port || 587),
+          smtp_user: draft.smtp_user || "",
+          smtp_password: draft.smtp_password || undefined,
+          smtp_tls_mode: draft.smtp_tls_mode || "starttls",
+          api_key: draft.api_key || undefined,
+          aws_access_key_id: draft.aws_access_key_id || "",
+          aws_secret_key: draft.aws_secret_key || undefined,
+          aws_region: draft.aws_region || "us-east-1",
+        }),
+      });
+      notify(res.message || "Test email sent successfully.");
+    } catch (e) {
+      notify(`Test failed: ${(e as Error).message}`);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <>
+      <Card
+        title="Transactional email delivery"
+        description="Send email verifications and password reset links from your own domain and email provider."
+      >
+        <div className="form-narrow">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={Boolean(draft.enabled)}
+              onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })}
+            />
+            <strong>Enable custom email delivery</strong>
+          </label>
+
+          {!draft.enabled && (
+            <div className="notice">
+              Custom email is currently disabled. Outbound emails fall back to the platform mailer ({data.platform_from || "platform default"}).
+            </div>
+          )}
+
+          <label className="field">
+            <span>Provider</span>
+            <select
+              value={provider}
+              onChange={(e) => setDraft({ ...draft, provider: e.target.value })}
+            >
+              <option value="smtp">Custom SMTP (Mailgun, SendGrid, Brevo, Self-hosted)</option>
+              <option value="resend">Resend (API Key)</option>
+              <option value="postmark">Postmark (Server API Token)</option>
+              <option value="ses">Amazon SES (Access Key &amp; Region)</option>
+            </select>
+          </label>
+
+          <Field
+            label="From name"
+            value={draft.from_name || ""}
+            onChange={(v) => setDraft({ ...draft, from_name: v })}
+            placeholder="e.g. Acme Security"
+          />
+          <Field
+            label="From email"
+            type="email"
+            value={draft.from_email || ""}
+            onChange={(v) => setDraft({ ...draft, from_email: v })}
+            placeholder="e.g. auth@acme.com"
+          />
+          <Field
+            label="Reply-to (optional)"
+            type="email"
+            value={draft.reply_to || ""}
+            onChange={(v) => setDraft({ ...draft, reply_to: v })}
+            placeholder="e.g. support@acme.com"
+          />
+
+          {provider === "smtp" && (
+            <>
+              <Field
+                label="SMTP Host"
+                value={draft.smtp_host || ""}
+                onChange={(v) => setDraft({ ...draft, smtp_host: v })}
+                placeholder="smtp.example.com"
+              />
+              <Field
+                label="SMTP Port"
+                type="number"
+                value={draft.smtp_port || 587}
+                onChange={(v) => setDraft({ ...draft, smtp_port: v })}
+              />
+              <Field
+                label="SMTP Username"
+                value={draft.smtp_user || ""}
+                onChange={(v) => setDraft({ ...draft, smtp_user: v })}
+                placeholder="username or API user"
+              />
+              <Field
+                label={data.smtp_has_password ? "SMTP Password (saved, enter to change)" : "SMTP Password"}
+                type="password"
+                value={draft.smtp_password || ""}
+                onChange={(v) => setDraft({ ...draft, smtp_password: v })}
+                placeholder={data.smtp_has_password ? "••••••••••••" : "Enter password"}
+              />
+              <label className="field">
+                <span>TLS Mode</span>
+                <select
+                  value={draft.smtp_tls_mode || "starttls"}
+                  onChange={(e) => setDraft({ ...draft, smtp_tls_mode: e.target.value })}
+                >
+                  <option value="starttls">STARTTLS (Port 587 recommended)</option>
+                  <option value="implicit">Implicit TLS / SSL (Port 465)</option>
+                  <option value="none">Plain / None (Local dev / port 25 or 1025)</option>
+                </select>
+              </label>
+            </>
+          )}
+
+          {provider === "resend" && (
+            <Field
+              label={data.has_api_key ? "Resend API Key (saved, enter to change)" : "Resend API Key"}
+              type="password"
+              value={draft.api_key || ""}
+              onChange={(v) => setDraft({ ...draft, api_key: v })}
+              placeholder={data.has_api_key ? "re_••••••••••••" : "re_123456789"}
+            />
+          )}
+
+          {provider === "postmark" && (
+            <Field
+              label={data.has_api_key ? "Postmark Server Token (saved, enter to change)" : "Postmark Server Token"}
+              type="password"
+              value={draft.api_key || ""}
+              onChange={(v) => setDraft({ ...draft, api_key: v })}
+              placeholder={data.has_api_key ? "••••••••-••••-••••" : "Your Postmark server token"}
+            />
+          )}
+
+          {provider === "ses" && (
+            <>
+              <Field
+                label="AWS Access Key ID"
+                value={draft.aws_access_key_id || ""}
+                onChange={(v) => setDraft({ ...draft, aws_access_key_id: v })}
+                placeholder="AKIAIOSFODNN7EXAMPLE"
+              />
+              <Field
+                label={data.aws_has_secret_key ? "AWS Secret Access Key (saved, enter to change)" : "AWS Secret Access Key"}
+                type="password"
+                value={draft.aws_secret_key || ""}
+                onChange={(v) => setDraft({ ...draft, aws_secret_key: v })}
+                placeholder={data.aws_has_secret_key ? "••••••••••••" : "Secret access key"}
+              />
+              <Field
+                label="AWS Region"
+                value={draft.aws_region || "us-east-1"}
+                onChange={(v) => setDraft({ ...draft, aws_region: v })}
+                placeholder="us-east-1"
+              />
+            </>
+          )}
+
+          <div className="actions">
+            <Button primary onClick={save}>Save email settings</Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        title="Send test email"
+        description="Verify delivery and credentials before putting your email provider into production."
+      >
+        <div className="form-narrow">
+          <Field
+            label="Recipient email address"
+            type="email"
+            value={testTo}
+            onChange={setTestTo}
+            placeholder="you@example.com (leave blank for your account email)"
+          />
+          <Button onClick={sendTest} disabled={testing}>
+            {testing ? "Sending test…" : "Send test email"}
+          </Button>
+        </div>
+      </Card>
+    </>
+  );
 }

@@ -29,6 +29,7 @@ func TestSocialIdentityScopeCollisionAndUnlinkIntegration(t *testing.T) {
 
 	users := store.NewUsers(db)
 	identities := store.NewSocialIdentities(db)
+	_, _ = db.Exec(ctx, `DELETE FROM users WHERE email IN ('identity-owner@sooauth.local', 'identity-other@sooauth.local')`)
 	user, err := users.CreatePlatformUser(ctx, "identity-owner@sooauth.local", "identity-pass")
 	if err != nil {
 		t.Fatal(err)

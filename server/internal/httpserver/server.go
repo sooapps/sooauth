@@ -57,6 +57,7 @@ type Server struct {
 	webhooks       *webhooks.Dispatcher
 	webhookStore   *store.Webhooks
 	identities     *store.SocialIdentities
+	emailSettings  *store.TenantEmailSettingsStore
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server, error) {
@@ -78,6 +79,7 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 	users := store.NewUsers(db)
 	webhookStore := store.NewWebhooks(db)
 	webhookDispatcher := webhooks.NewDispatcher(webhookStore)
+	emailSettings := store.NewTenantEmailSettings(db, cfg.MFAEncryptionKey)
 	mailer := mail.NewWithSettings(mail.Settings{
 		URL:       cfg.SMTPURL,
 		Host:      cfg.SMTPHost,
@@ -102,6 +104,7 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 		jwtIssuer,
 		mfaSvc,
 		webhookDispatcher,
+		emailSettings,
 	)
 
 	pageRenderer, err := pages.NewRenderer()
@@ -174,9 +177,10 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 				billingproviders.NewStripe(),
 			},
 		),
-		webhooks:     webhookDispatcher,
-		webhookStore: webhookStore,
-		identities:   store.NewSocialIdentities(db),
+		webhooks:      webhookDispatcher,
+		webhookStore:  webhookStore,
+		identities:    store.NewSocialIdentities(db),
+		emailSettings: emailSettings,
 	}
 
 	return s, nil
@@ -276,6 +280,9 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("PUT /dashboard/api/providers/{provider}", s.handleDashboardProviderUpdate)
 	mux.HandleFunc("GET /dashboard/api/theme", s.handleDashboardThemeGet)
 	mux.HandleFunc("PUT /dashboard/api/theme", s.handleDashboardThemePut)
+	mux.HandleFunc("GET /dashboard/api/email", s.handleDashboardEmailGet)
+	mux.HandleFunc("PUT /dashboard/api/email", s.handleDashboardEmailPut)
+	mux.HandleFunc("POST /dashboard/api/email/test", s.handleDashboardEmailTest)
 	mux.HandleFunc("GET /dashboard/api/billing", s.handleDashboardBilling)
 	mux.HandleFunc("POST /dashboard/api/billing/upgrade", s.handleDashboardBillingUpgrade)
 	mux.HandleFunc("GET /dashboard/api/webhooks", s.handleDashboardWebhooks)

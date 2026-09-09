@@ -18,6 +18,7 @@ type Settings struct {
 	Password  string
 	From      string
 	BrandName string
+	TLSMode   string
 }
 
 type Outbound struct {
@@ -25,6 +26,10 @@ type Outbound struct {
 	Subject string
 	Plain   string
 	HTML    string
+}
+
+type Sender interface {
+	SendOutbound(msg Outbound) error
 }
 
 type Mailer struct {
@@ -60,8 +65,11 @@ func (m *Mailer) SendOutbound(msg Outbound) error {
 	}
 
 	raw := buildMessage(m.formattedFrom(), msg)
-	if implicitTLS {
+	if strings.EqualFold(m.settings.TLSMode, "implicit") || (implicitTLS && m.settings.TLSMode == "") {
 		return sendImplicitTLS(host, auth, m.fromAddress(), msg.To, []byte(raw))
+	}
+	if strings.EqualFold(m.settings.TLSMode, "none") {
+		return sendPlainSMTP(host, auth, m.fromAddress(), msg.To, []byte(raw))
 	}
 	return smtp.SendMail(host, auth, m.fromAddress(), []string{msg.To}, []byte(raw))
 }
@@ -216,3 +224,43 @@ func sendImplicitTLS(addr string, auth smtp.Auth, from, to string, msg []byte) e
 	}
 	return w.Close()
 }
+
+func sendPlainSMTP(addr string, auth smtp.Auth, from, to string, msg []byte) error {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	host, _, _ := net.SplitHostPort(addr)
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	if auth != nil {
+		if ok, _ := client.Extension("AUTH"); ok {
+			if err := client.Auth(auth); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	if err := client.Rcpt(to); err != nil {
+		return err
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(msg); err != nil {
+		return err
+	}
+	return w.Close()
+}
+

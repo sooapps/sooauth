@@ -33,7 +33,13 @@ type verificationMailOpts struct {
 }
 
 func (s *Service) sendVerificationMail(ctx context.Context, opts verificationMailOpts) error {
-	if s.cfg.Env == "production" && !s.cfg.SMTPConfigured() {
+	var tenantID *uuid.UUID
+	if opts.User != nil {
+		tenantID = opts.User.TenantID
+	}
+	mailer := s.resolveMailer(ctx, tenantID)
+
+	if s.cfg.Env == "production" && mailer == s.mail && !s.cfg.SMTPConfigured() {
 		return fmt.Errorf("SMTP not configured")
 	}
 	if opts.User == nil {
@@ -76,7 +82,7 @@ func (s *Service) sendVerificationMail(ctx context.Context, opts verificationMai
 
 	tx := mail.Transactional{BrandName: opts.BrandName, AppURL: s.cfg.AppURL}
 	subject, plainBody, htmlBody := tx.VerificationDeliveryEmail(content, opts.AppScoped)
-	return s.mail.SendOutbound(mail.Outbound{
+	return mailer.SendOutbound(mail.Outbound{
 		To:      opts.User.Email,
 		Subject: subject,
 		Plain:   plainBody,
