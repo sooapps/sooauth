@@ -4,13 +4,15 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sooapps/sooauth/server/internal/auth"
-	appjwt "github.com/sooapps/sooauth/server/internal/crypto/jwt"
 	"github.com/sooapps/sooauth/server/internal/config"
+	appjwt "github.com/sooapps/sooauth/server/internal/crypto/jwt"
 	"github.com/sooapps/sooauth/server/internal/crypto/signing"
+	"github.com/sooapps/sooauth/server/internal/crypto/token"
 	"github.com/sooapps/sooauth/server/internal/mail"
 	"github.com/sooapps/sooauth/server/internal/migrate"
 	"github.com/sooapps/sooauth/server/internal/ratelimit"
@@ -208,6 +210,9 @@ func TestPasswordResetOptsAndCodeFlow(t *testing.T) {
 	if err != nil || user == nil {
 		t.Fatal("user not found")
 	}
+	if err := store.NewUsers(db).MarkEmailVerified(ctx, user.ID); err != nil {
+		t.Fatal(err)
+	}
 
 	// Request code delivery
 	err = svc.ForgotPasswordWithOpts(ctx, auth.ForgotPasswordOpts{
@@ -239,5 +244,20 @@ func TestPasswordResetOptsAndCodeFlow(t *testing.T) {
 	err = svc.ResetPasswordWithCode(ctx, email, "000000", "short", "127.0.0.1")
 	if err == nil {
 		t.Fatal("expected weak password error, got nil")
+	}
+
+	// Insert known verification code and test success
+	knownCode := "842109"
+	err = store.NewVerificationTokens(db).Create(ctx, user.ID, email, "password_reset_code", token.Hash(knownCode), time.Now().UTC().Add(15*time.Minute))
+	if err != nil {
+		t.Fatalf("failed to insert test verification token: %v", err)
+	}
+	newPass := "brand-new-password-123"
+	if err := svc.ResetPasswordWithCode(ctx, email, knownCode, newPass, "127.0.0.1"); err != nil {
+		t.Fatalf("expected ResetPasswordWithCode success, got: %v", err)
+	}
+	bundle, err := svc.SignIn(ctx, email, newPass, "127.0.0.1", "test")
+	if err != nil || bundle.AccessToken == "" {
+		t.Fatalf("sign-in with updated password failed: %v", err)
 	}
 }

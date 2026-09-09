@@ -417,7 +417,10 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if delivery == "" {
+	switch delivery {
+	case "code", "link":
+		// valid
+	default:
 		delivery = "link"
 	}
 
