@@ -169,6 +169,22 @@ export default function EmbedWidgetPage() {
 
       <section className="mt-10">
         <h2 className="font-sans text-[22px] font-semibold text-fg">
+          Password reset (Forgot password)
+        </h2>
+        <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
+          embed.js includes a built-in &quot;Forgot password?&quot; toggle on sign-in. Users can request
+          password reset instructions, or enter their 6-digit OTP code directly inside the widget to choose a new password without leaving your page.
+        </p>
+        <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
+          When a user successfully updates their password, embed.js fires:
+        </p>
+        <pre className="mt-4 overflow-x-auto border border-line bg-bg-subtle px-4 py-3 font-mono text-[13px] leading-[1.7] text-fg">{`document.addEventListener("sooauth:password_reset", (e) => {
+  console.log("Password reset completed for:", e.detail.email);
+});`}</pre>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="font-sans text-[22px] font-semibold text-fg">
           Custom UI instead?
         </h2>
         <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">

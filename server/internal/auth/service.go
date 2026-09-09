@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/sooapps/sooauth/server/internal/emailverify"
 	"github.com/sooapps/sooauth/server/internal/mail"
 	"github.com/sooapps/sooauth/server/internal/mfa"
+	"github.com/sooapps/sooauth/server/internal/passwordpolicy"
 	"github.com/sooapps/sooauth/server/internal/ratelimit"
 	"github.com/sooapps/sooauth/server/internal/store"
 	"github.com/sooapps/sooauth/server/internal/webhooks"
@@ -480,12 +482,41 @@ func (s *Service) VerifyEmailByCode(ctx context.Context, tenantID *uuid.UUID, em
 	return verified, false, err
 }
 
+type ForgotPasswordOpts struct {
+	Email     string
+	IP        string
+	TenantID  *uuid.UUID
+	ClientID  string
+	ReturnTo  string
+	Delivery  string
+	BrandName string
+	AppScoped bool
+}
+
 func (s *Service) ForgotPassword(ctx context.Context, email, ip string) error {
-	if ok, _ := s.limit.Allow(ctx, "forgot_ip", ip, 5, time.Minute); !ok {
+	return s.ForgotPasswordWithOpts(ctx, ForgotPasswordOpts{
+		Email: email,
+		IP:    ip,
+	})
+}
+
+func (s *Service) ForgotPasswordWithOpts(ctx context.Context, opts ForgotPasswordOpts) error {
+	if ok, _ := s.limit.Allow(ctx, "forgot_ip", opts.IP, 5, time.Minute); !ok {
 		return ErrRateLimited
 	}
 
-	user, _, err := s.users.FindPlatformByEmail(ctx, email)
+	email := strings.ToLower(strings.TrimSpace(opts.Email))
+	if email == "" {
+		return nil
+	}
+
+	var user *store.User
+	var err error
+	if opts.TenantID != nil {
+		user, err = s.users.FindByEmailSimpleInTenant(ctx, *opts.TenantID, email)
+	} else {
+		user, err = s.users.FindPlatformByEmailSimple(ctx, email)
+	}
 	if err != nil {
 		return err
 	}
@@ -493,18 +524,48 @@ func (s *Service) ForgotPassword(ctx context.Context, email, ip string) error {
 		return nil
 	}
 
-	plain, hash, err := token.Generate()
-	if err != nil {
-		return err
-	}
-	expires := time.Now().UTC().Add(time.Hour)
-	if err := s.tokens.Create(ctx, user.ID, user.Email, "password_reset", hash, expires); err != nil {
-		return err
+	_ = s.tokens.DeletePending(ctx, user.ID, "password_reset", "password_reset_code")
+
+	brand := strings.TrimSpace(opts.BrandName)
+	if brand == "" {
+		brand = s.cfg.BrandName
 	}
 
-	link := fmt.Sprintf("%s/auth/reset-password?token=%s", trimSlash(s.cfg.AppURL), plain)
-	tx := mail.Transactional{BrandName: s.cfg.BrandName, AppURL: s.cfg.AppURL}
-	subject, plainBody, htmlBody := tx.PasswordResetEmail(link)
+	delivery := strings.ToLower(strings.TrimSpace(opts.Delivery))
+	useCode := delivery == "code"
+
+	d := mail.PasswordResetDelivery{}
+	if useCode {
+		code, hash, err := emailverify.GenerateCode()
+		if err != nil {
+			return err
+		}
+		expires := time.Now().UTC().Add(15 * time.Minute)
+		if err := s.tokens.Create(ctx, user.ID, user.Email, "password_reset_code", hash, expires); err != nil {
+			return err
+		}
+		d.Code = code
+	} else {
+		plain, hash, err := token.Generate()
+		if err != nil {
+			return err
+		}
+		expires := time.Now().UTC().Add(time.Hour)
+		if err := s.tokens.Create(ctx, user.ID, user.Email, "password_reset", hash, expires); err != nil {
+			return err
+		}
+		q := url.Values{"token": {plain}}
+		if cid := strings.TrimSpace(opts.ClientID); cid != "" {
+			q.Set("client_id", cid)
+		}
+		if rt := strings.TrimSpace(opts.ReturnTo); rt != "" {
+			q.Set("return_to", rt)
+		}
+		d.LinkURL = fmt.Sprintf("%s/auth/reset-password?%s", trimSlash(s.cfg.AppURL), q.Encode())
+	}
+
+	tx := mail.Transactional{BrandName: brand, AppURL: s.cfg.AppURL}
+	subject, plainBody, htmlBody := tx.PasswordResetDeliveryEmail(d, opts.AppScoped)
 	_ = s.mail.SendOutbound(mail.Outbound{
 		To:      user.Email,
 		Subject: subject,
@@ -513,7 +574,7 @@ func (s *Service) ForgotPassword(ctx context.Context, email, ip string) error {
 	})
 
 	uid := user.ID
-	s.audit.Log(ctx, &uid, "password_reset_requested", nil, ip)
+	s.audit.Log(ctx, &uid, "password_reset_requested", nil, opts.IP)
 	return nil
 }
 
@@ -521,8 +582,40 @@ func (s *Service) ResetPassword(ctx context.Context, plainToken, newPassword, ip
 	if ok, _ := s.limit.Allow(ctx, "reset_ip", ip, 10, time.Minute); !ok {
 		return ErrRateLimited
 	}
+	if err := passwordpolicy.Default().Validate(newPassword); err != nil {
+		return err
+	}
 
 	userID, err := s.tokens.Consume(ctx, "password_reset", token.Hash(plainToken))
+	if err != nil {
+		return err
+	}
+	if err := s.users.UpdatePassword(ctx, userID, newPassword); err != nil {
+		return err
+	}
+	_ = s.sess.RevokeAllForUser(ctx, userID)
+	_ = s.refresh.RevokeAllForUser(ctx, userID)
+	s.audit.Log(ctx, &userID, "password_reset", nil, ip)
+	if user, findErr := s.users.FindByID(ctx, userID); findErr == nil {
+		s.emit(ctx, user.TenantID, "password.reset", user, map[string]any{"ip": ip})
+	}
+	return nil
+}
+
+func (s *Service) ResetPasswordWithCode(ctx context.Context, email, code, newPassword, ip string) error {
+	if ok, _ := s.limit.Allow(ctx, "reset_ip", ip, 10, time.Minute); !ok {
+		return ErrRateLimited
+	}
+	if err := passwordpolicy.Default().Validate(newPassword); err != nil {
+		return err
+	}
+
+	code = emailverify.NormalizeCode(code)
+	if !emailverify.ValidCode(code) {
+		return ErrInvalidToken
+	}
+
+	userID, err := s.tokens.ConsumeCode(ctx, email, "password_reset_code", token.Hash(code))
 	if err != nil {
 		return err
 	}

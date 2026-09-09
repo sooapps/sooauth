@@ -24,14 +24,69 @@ PKCE by hand.
 | POST | `/auth/sign-in` | Sign in with email and password |
 | POST | `/auth/sign-out` | Revoke the current cookie session |
 | GET | `/auth/me` | Read the current account |
-| POST | `/auth/forgot-password` | Start a password reset |
-| POST | `/auth/reset-password` | Complete a password reset |
+| POST | `/auth/forgot-password` | Start a password reset (link or 6-digit code) |
+| POST | `/auth/reset-password` | Complete a password reset with token or code |
 | POST | `/auth/resend-verification` | Resend email verification |
 | POST | `/auth/verify-code` | Verify a six-digit app code |
 
 Mutating browser requests that use cookies require the `X-CSRF-Token` header.
 Public app endpoints use `client_id` to select a project. Never put provider
 secrets in an application; social provider credentials belong in the dashboard.
+
+## Password Reset (Forgot Password)
+
+Password reset supports both tenant-scoped users and platform administrators.
+
+### Request Password Reset
+
+`POST /auth/forgot-password`
+
+```json
+{
+  "email": "user@example.com",
+  "client_id": "app_your_client_id",
+  "return_to": "https://myapp.com/dashboard",
+  "delivery": "link"
+}
+```
+
+* `email` *(required)*: User's registered email address.
+* `client_id` *(optional)*: Scopes lookup and reset links to your tenant project.
+* `return_to` *(optional)*: Redirect URL after resetting password on hosted UI.
+* `delivery` *(optional)*: `"link"` (default) sends a 1-hour secure link button; `"code"` sends a 15-minute 6-digit numeric OTP code. If omitted, uses the tenant's default delivery preference.
+
+Response:
+
+```json
+{
+  "message": "If an account exists for that email, we sent reset instructions.",
+  "delivery": "link"
+}
+```
+
+### Complete Password Reset
+
+`POST /auth/reset-password`
+
+**Option A: Reset via Token Link:**
+```json
+{
+  "token": "raw-token-from-email-link",
+  "password": "newSecurePassword123!"
+}
+```
+
+**Option B: Reset via 6-Digit Code (In-App / Widget / Mobile):**
+```json
+{
+  "email": "user@example.com",
+  "code": "123456",
+  "password": "newSecurePassword123!",
+  "client_id": "app_your_client_id"
+}
+```
+
+On success, existing sessions and refresh tokens for that user are revoked, and `{"message": "Password updated. Sign in with your new password."}` is returned.
 
 ## Passkeys and MFA
 

@@ -18,8 +18,8 @@
     <button type="submit">Sign in</button>
   </form>
   <div class="links">
-    <a href="/auth/sign-up">Create account</a>
-    <a href="/auth/forgot-password">Forgot password</a>
+    <a href="/auth/sign-up{{if .ClientID}}?client_id={{.ClientID}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo}}{{end}}">Create account</a>
+    <a href="/auth/forgot-password{{if .ClientID}}?client_id={{.ClientID}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo}}{{end}}">Forgot password</a>
   </div>
   <div class="passkey">
     <button type="button" id="passkey-sign-in" class="btn ghost">Sign in with passkey</button>

@@ -162,10 +162,19 @@ if (forgot) {
     clearFeedback(forgot);
     const stopLoading = setSubmitLoading(forgot, true, "Sending…");
     const fd = new FormData(forgot);
+    const clientId = forgot.dataset.clientId || "";
+    const returnTo = forgot.dataset.returnTo || "";
     try {
-      await postJSON("/auth/forgot-password", { email: fd.get("email") });
+      const res = await postJSON("/auth/forgot-password", {
+        email: fd.get("email"),
+        client_id: clientId,
+        return_to: returnTo,
+      });
       stopLoading();
-      showMessage(forgot, "If an account exists, we sent reset instructions.");
+      const msg = res && res.delivery === "code"
+        ? "If an account exists, we sent a 6-digit reset code to your email."
+        : "If an account exists, we sent reset instructions.";
+      showMessage(forgot, msg);
     } catch (err) {
       stopLoading();
       showError(forgot, errorText(err));
@@ -180,6 +189,8 @@ if (reset) {
     clearFeedback(reset);
     const stopLoading = setSubmitLoading(reset, true, "Updating…");
     const fd = new FormData(reset);
+    const clientId = reset.dataset.clientId || "";
+    const returnTo = reset.dataset.returnTo || "";
     try {
       await postJSON("/auth/reset-password", {
         token: reset.dataset.token,
@@ -187,7 +198,14 @@ if (reset) {
       });
       stopLoading();
       setSubmitLoading(reset, true, "Redirecting…");
-      location.href = "/auth/sign-in?message=Password+updated";
+      if (returnTo) {
+        location.href = returnTo;
+      } else {
+        const q = new URLSearchParams();
+        q.set("message", "Password updated");
+        if (clientId) q.set("client_id", clientId);
+        location.href = "/auth/sign-in?" + q.toString();
+      }
     } catch (err) {
       stopLoading();
       showError(reset, errorText(err));
