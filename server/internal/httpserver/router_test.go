@@ -53,8 +53,12 @@ func TestAccountPasswordCORS(t *testing.T) {
 		t.Fatalf("expected CORS header on OPTIONS /auth/account/password, got %q", w.Header().Get("Access-Control-Allow-Origin"))
 	}
 	methods := w.Header().Get("Access-Control-Allow-Methods")
-	if methods == "" {
-		t.Fatal("expected Access-Control-Allow-Methods header")
+	if methods != "GET, POST, PUT, DELETE, OPTIONS" {
+		t.Fatalf("unexpected Access-Control-Allow-Methods: %q", methods)
+	}
+	headers := w.Header().Get("Access-Control-Allow-Headers")
+	if headers != "Content-Type, Authorization, X-Sooauth-Embed, X-CSRF-Token" {
+		t.Fatalf("unexpected Access-Control-Allow-Headers: %q", headers)
 	}
 
 	req = httptest.NewRequest("OPTIONS", "/auth/account/password/set", nil)

@@ -293,11 +293,20 @@ func (s *Server) handleAccountChangePassword(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	if currentSessID != uuid.Nil {
-		_ = s.sessions.RevokeOthersForUser(r.Context(), user.ID, currentSessID)
+		if err := s.sessions.RevokeOthersForUser(r.Context(), user.ID, currentSessID); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "sessions_revoke_failed"})
+			return
+		}
 	} else {
-		_ = s.sessions.RevokeAllForUser(r.Context(), user.ID)
+		if err := s.sessions.RevokeAllForUser(r.Context(), user.ID); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "sessions_revoke_failed"})
+			return
+		}
 	}
-	_ = s.refresh.RevokeAllForUser(r.Context(), user.ID)
+	if err := s.refresh.RevokeAllForUser(r.Context(), user.ID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "refresh_tokens_revoke_failed"})
+		return
+	}
 
 	auditMeta := map[string]any{"email": user.Email}
 	if user.TenantID != nil {
@@ -355,11 +364,20 @@ func (s *Server) handleAccountSetPassword(w http.ResponseWriter, r *http.Request
 		}
 	}
 	if currentSessID != uuid.Nil {
-		_ = s.sessions.RevokeOthersForUser(r.Context(), user.ID, currentSessID)
+		if err := s.sessions.RevokeOthersForUser(r.Context(), user.ID, currentSessID); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "sessions_revoke_failed"})
+			return
+		}
 	} else {
-		_ = s.sessions.RevokeAllForUser(r.Context(), user.ID)
+		if err := s.sessions.RevokeAllForUser(r.Context(), user.ID); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "sessions_revoke_failed"})
+			return
+		}
 	}
-	_ = s.refresh.RevokeAllForUser(r.Context(), user.ID)
+	if err := s.refresh.RevokeAllForUser(r.Context(), user.ID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "refresh_tokens_revoke_failed"})
+		return
+	}
 
 	auditMeta := map[string]any{"email": user.Email}
 	if user.TenantID != nil {

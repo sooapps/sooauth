@@ -35,8 +35,28 @@ export function PasswordModal({
 
   const token = accessToken ?? client.getSession?.()?.accessToken;
 
+  const fetchStatus = React.useCallback(() => {
+    setFetchingStatus(true);
+    setError(null);
+
+    client
+      .getPasswordStatus(token)
+      .then((res) => {
+        setHasPassword(res.has_password);
+      })
+      .catch((err) => {
+        setError(err.message || "Failed to load account security details");
+        setHasPassword(null);
+      })
+      .finally(() => {
+        setFetchingStatus(false);
+      });
+  }, [client, token]);
+
   useEffect(() => {
     if (!isOpen) {
+      setHasPassword(null);
+      setFetchingStatus(false);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -45,29 +65,8 @@ export function PasswordModal({
       return;
     }
 
-    let isMounted = true;
-    setFetchingStatus(true);
-    setError(null);
-
-    client
-      .getPasswordStatus(token)
-      .then((res) => {
-        if (isMounted) setHasPassword(res.has_password);
-      })
-      .catch((err) => {
-        if (isMounted) {
-          setError(err.message || "Failed to load account security details");
-          setHasPassword(true);
-        }
-      })
-      .finally(() => {
-        if (isMounted) setFetchingStatus(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, client, token]);
+    fetchStatus();
+  }, [isOpen, fetchStatus]);
 
   if (!isOpen) return null;
 
@@ -216,6 +215,25 @@ export function PasswordModal({
         {fetchingStatus ? (
           <div style={{ textAlign: "center", padding: "24px 0", color: "#64748b", fontSize: "0.875rem" }}>
             Loading security details...
+          </div>
+        ) : hasPassword === null ? (
+          <div style={{ textAlign: "center", padding: "16px 0" }}>
+            <button
+              type="button"
+              onClick={() => fetchStatus()}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                backgroundColor: "#ffffff",
+                color: "#334155",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              Retry
+            </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
