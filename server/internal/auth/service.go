@@ -38,6 +38,17 @@ type MFARequiredError struct{ Challenge string }
 
 func (e *MFARequiredError) Error() string { return "mfa required" }
 
+const (
+	PersistentSessionTTL = 30 * 24 * time.Hour
+	PersistentRefreshTTL = 30 * 24 * time.Hour
+	TransientSessionTTL  = 24 * time.Hour
+	TransientRefreshTTL  = 24 * time.Hour
+)
+
+type SignInOptions struct {
+	RememberMe bool
+}
+
 type TokenBundle struct {
 	AccessToken  string
 	RefreshToken string
@@ -45,6 +56,7 @@ type TokenBundle struct {
 	CSRFToken    string
 	ExpiresIn    int
 	User         *store.User
+	RememberMe   bool
 }
 
 type Service struct {
@@ -173,6 +185,10 @@ func (s *Service) ResendVerification(ctx context.Context, email, ip string) erro
 }
 
 func (s *Service) SignInApp(ctx context.Context, tenantID uuid.UUID, email, plainPassword, ip, userAgent string, requireVerified bool) (*TokenBundle, error) {
+	return s.SignInAppWithOptions(ctx, tenantID, email, plainPassword, ip, userAgent, requireVerified, SignInOptions{RememberMe: true})
+}
+
+func (s *Service) SignInAppWithOptions(ctx context.Context, tenantID uuid.UUID, email, plainPassword, ip, userAgent string, requireVerified bool, opts SignInOptions) (*TokenBundle, error) {
 	if ok, _ := s.limit.Allow(ctx, "signin_ip", ip, 20, time.Minute); !ok {
 		return nil, ErrRateLimited
 	}
@@ -202,7 +218,7 @@ func (s *Service) SignInApp(ctx context.Context, tenantID uuid.UUID, email, plai
 		return nil, ErrUserDisabled
 	}
 
-	return s.completeSignIn(ctx, found, ip, userAgent, "signin")
+	return s.completeSignIn(ctx, found, ip, userAgent, "signin", opts.RememberMe)
 }
 
 func (s *Service) VerifyMFA(ctx context.Context, challenge, code, ip, userAgent string) (*TokenBundle, error) {
@@ -217,7 +233,7 @@ func (s *Service) VerifyMFA(ctx context.Context, challenge, code, ip, userAgent 
 	if err != nil || user == nil {
 		return nil, ErrInvalidToken
 	}
-	return s.completeSignIn(ctx, user, ip, userAgent, "mfa_signin")
+	return s.completeSignIn(ctx, user, ip, userAgent, "mfa_signin", true)
 }
 
 func (s *Service) SignInForTenant(ctx context.Context, email, plainPassword, ip, userAgent string, requireVerified bool) (*TokenBundle, error) {
@@ -225,6 +241,10 @@ func (s *Service) SignInForTenant(ctx context.Context, email, plainPassword, ip,
 }
 
 func (s *Service) SignIn(ctx context.Context, email, plainPassword, ip, userAgent string) (*TokenBundle, error) {
+	return s.SignInWithOptions(ctx, email, plainPassword, ip, userAgent, SignInOptions{RememberMe: true})
+}
+
+func (s *Service) SignInWithOptions(ctx context.Context, email, plainPassword, ip, userAgent string, opts SignInOptions) (*TokenBundle, error) {
 	if ok, _ := s.limit.Allow(ctx, "signin_ip", ip, 20, time.Minute); !ok {
 		return nil, ErrRateLimited
 	}
@@ -263,33 +283,40 @@ func (s *Service) SignIn(ctx context.Context, email, plainPassword, ip, userAgen
 		}
 	}
 
-	return s.completeSignIn(ctx, found, ip, userAgent, "signin")
+	return s.completeSignIn(ctx, found, ip, userAgent, "signin", opts.RememberMe)
 }
 
 func (s *Service) SignInSocial(ctx context.Context, user *store.User, ip, userAgent string) (*TokenBundle, error) {
-	return s.completeSignIn(ctx, user, ip, userAgent, "social_signin")
+	return s.completeSignIn(ctx, user, ip, userAgent, "social_signin", true)
 }
 
 func (s *Service) SignInVerifiedUser(ctx context.Context, user *store.User, ip, userAgent string) (*TokenBundle, error) {
-	return s.completeSignIn(ctx, user, ip, userAgent, "email_verified_signin")
+	return s.completeSignIn(ctx, user, ip, userAgent, "email_verified_signin", true)
 }
 
-func (s *Service) completeSignIn(ctx context.Context, user *store.User, ip, userAgent, auditAction string) (*TokenBundle, error) {
+func (s *Service) completeSignIn(ctx context.Context, user *store.User, ip, userAgent, auditAction string, rememberMe bool) (*TokenBundle, error) {
 	if user.DisabledAt != nil {
 		return nil, ErrUserDisabled
 	}
-	bundle, err := s.issueTokens(ctx, user, ip, userAgent)
+	bundle, err := s.issueTokens(ctx, user, ip, userAgent, rememberMe)
 	if err != nil {
 		return nil, err
 	}
 	uid := user.ID
-	s.audit.Log(ctx, &uid, auditAction, map[string]any{"email": user.Email}, ip)
-	s.emit(ctx, user.TenantID, "user.login", user, map[string]any{"ip": ip, "method": auditAction})
+	s.audit.Log(ctx, &uid, auditAction, map[string]any{"email": user.Email, "remember_me": rememberMe}, ip)
+	s.emit(ctx, user.TenantID, "user.login", user, map[string]any{"ip": ip, "method": auditAction, "remember_me": rememberMe})
 	return bundle, nil
 }
 
-func (s *Service) issueTokens(ctx context.Context, user *store.User, ip, userAgent string) (*TokenBundle, error) {
-	bundle, err := s.issueAccessRefresh(ctx, user, ip)
+func (s *Service) issueTokens(ctx context.Context, user *store.User, ip, userAgent string, rememberMe bool) (*TokenBundle, error) {
+	refreshTTL := PersistentRefreshTTL
+	sessionTTL := PersistentSessionTTL
+	if !rememberMe {
+		refreshTTL = TransientRefreshTTL
+		sessionTTL = TransientSessionTTL
+	}
+
+	bundle, err := s.issueAccessRefreshWithTTL(ctx, user, ip, refreshTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +325,7 @@ func (s *Service) issueTokens(ctx context.Context, user *store.User, ip, userAge
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.sess.Create(ctx, user.ID, sessionHash, ip, userAgent); err != nil {
+	if _, err := s.sess.CreateWithTTL(ctx, user.ID, sessionHash, ip, userAgent, sessionTTL); err != nil {
 		return nil, err
 	}
 
@@ -309,6 +336,7 @@ func (s *Service) issueTokens(ctx context.Context, user *store.User, ip, userAge
 
 	bundle.SessionToken = sessionPlain
 	bundle.CSRFToken = csrf
+	bundle.RememberMe = rememberMe
 	return bundle, nil
 }
 
@@ -317,6 +345,10 @@ func (s *Service) IssueOIDCTokens(ctx context.Context, user *store.User, ip stri
 }
 
 func (s *Service) issueAccessRefresh(ctx context.Context, user *store.User, ip string) (*TokenBundle, error) {
+	return s.issueAccessRefreshWithTTL(ctx, user, ip, PersistentRefreshTTL)
+}
+
+func (s *Service) issueAccessRefreshWithTTL(ctx context.Context, user *store.User, ip string, refreshTTL time.Duration) (*TokenBundle, error) {
 	access, expires, err := s.jwt.AccessToken(user.ID, user.Email)
 	if err != nil {
 		return nil, err
@@ -327,7 +359,7 @@ func (s *Service) issueAccessRefresh(ctx context.Context, user *store.User, ip s
 		return nil, err
 	}
 	familyID := uuid.New()
-	if _, err := s.refresh.Issue(ctx, user.ID, familyID, refreshHash); err != nil {
+	if _, err := s.refresh.IssueWithTTL(ctx, user.ID, familyID, refreshHash, refreshTTL); err != nil {
 		return nil, err
 	}
 

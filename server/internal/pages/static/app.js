@@ -114,10 +114,13 @@ if (signIn) {
     signIn.querySelector(".resend-wrap")?.remove();
     const stopLoading = setSubmitLoading(signIn, true, "Signing in…");
     const fd = new FormData(signIn);
+    const rememberMeInput = signIn.querySelector('input[name="remember_me"]');
+    const rememberMe = rememberMeInput ? rememberMeInput.checked : true;
     try {
       await postJSON("/auth/sign-in", {
         email: fd.get("email"),
         password: fd.get("password"),
+        remember_me: rememberMe,
       });
       stopLoading();
       setSubmitLoading(signIn, true, "Redirecting…");

@@ -165,7 +165,7 @@ func (s *Server) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": msg})
 }
 
-func (s *Server) signInAppUser(ctx context.Context, clientID, email, password, ip, userAgent string) (*auth.TokenBundle, error) {
+func (s *Server) signInAppUser(ctx context.Context, clientID, email, password, ip, userAgent string, rememberMe bool) (*auth.TokenBundle, error) {
 	client, err := s.oauthClients.FindByClientID(ctx, clientID)
 	if err != nil || client == nil || client.TenantID == nil {
 		return nil, store.ErrInvalidClient
@@ -177,7 +177,7 @@ func (s *Server) signInAppUser(ctx context.Context, clientID, email, password, i
 		return nil, store.ErrInvalidClient
 	}
 
-	return s.auth.SignInApp(ctx, tenantID, email, password, ip, userAgent, tenant.EmailVerifyRequired)
+	return s.auth.SignInAppWithOptions(ctx, tenantID, email, password, ip, userAgent, tenant.EmailVerifyRequired, auth.SignInOptions{RememberMe: rememberMe})
 }
 
 func (s *Server) handleWidgetConfig(w http.ResponseWriter, r *http.Request) {
@@ -209,13 +209,21 @@ func (s *Server) handleWidgetConfig(w http.ResponseWriter, r *http.Request) {
 		verifyDelivery = tenant.VerifyDelivery().String()
 	}
 
-	theme, _ := s.theme.GetByTenant(r.Context(), tenantID)
-	providers, _ := s.social.EnabledForTenant(r.Context(), tenantID)
+	var theme store.Theme
+	if s.theme != nil {
+		theme, _ = s.theme.GetByTenant(r.Context(), tenantID)
+	}
+	var providers []string
+	if s.social != nil {
+		providers, _ = s.social.EnabledForTenant(r.Context(), tenantID)
+	}
 
-	account, _ := s.accounts.FindByTenantID(r.Context(), tenantID)
 	plan := "free"
-	if account != nil {
-		plan = account.Plan
+	if s.accounts != nil {
+		account, _ := s.accounts.FindByTenantID(r.Context(), tenantID)
+		if account != nil {
+			plan = account.Plan
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -227,6 +235,8 @@ func (s *Server) handleWidgetConfig(w http.ResponseWriter, r *http.Request) {
 		"show_powered_by":        plan == "free" || !theme.HideBranding,
 		"providers":              providers,
 		"email_password_enabled": true,
+		"remember_me_enabled":    true,
+		"remember_me_default":    true,
 		"email_verify_required":  emailVerifyRequired,
 		"email_verify_delivery":  verifyDelivery,
 		"password_policy": map[string]any{

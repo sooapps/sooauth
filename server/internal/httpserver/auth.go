@@ -175,21 +175,27 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		ClientID string `json:"client_id"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		ClientID   string `json:"client_id"`
+		RememberMe *bool  `json:"remember_me"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
 		return
 	}
 
+	rememberMe := true
+	if body.RememberMe != nil {
+		rememberMe = *body.RememberMe
+	}
+
 	var bundle *auth.TokenBundle
 	var err error
 	if strings.TrimSpace(body.ClientID) != "" {
-		bundle, err = s.signInAppUser(r.Context(), body.ClientID, body.Email, body.Password, clientIP(r), r.UserAgent())
+		bundle, err = s.signInAppUser(r.Context(), body.ClientID, body.Email, body.Password, clientIP(r), r.UserAgent(), rememberMe)
 	} else {
-		bundle, err = s.auth.SignIn(r.Context(), body.Email, body.Password, clientIP(r), r.UserAgent())
+		bundle, err = s.auth.SignInWithOptions(r.Context(), body.Email, body.Password, clientIP(r), r.UserAgent(), auth.SignInOptions{RememberMe: rememberMe})
 	}
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
@@ -547,6 +553,27 @@ func (s *Server) currentUser(r *http.Request) (*store.User, error) {
 }
 
 func setAuthCookies(w http.ResponseWriter, secure bool, domain string, bundle *auth.TokenBundle) {
+	rememberMe := true
+	if bundle != nil {
+		rememberMe = bundle.RememberMe
+	}
+
+	var maxAgeSession int
+	var maxAgeRefresh int
+	var maxAgeCSRF int
+
+	if rememberMe {
+		maxAgeSession = int((30 * 24 * time.Hour).Seconds())
+		maxAgeRefresh = int((30 * 24 * time.Hour).Seconds())
+		maxAgeCSRF = int((30 * 24 * time.Hour).Seconds())
+	} else {
+		// Session cookie: MaxAge <= 0 in Go http.Cookie omits Max-Age/Expires,
+		// expiring when the browser session ends.
+		maxAgeSession = 0
+		maxAgeRefresh = int((24 * time.Hour).Seconds())
+		maxAgeCSRF = 0
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    bundle.SessionToken,
@@ -555,7 +582,7 @@ func setAuthCookies(w http.ResponseWriter, secure bool, domain string, bundle *a
 		Secure:   secure,
 		Domain:   domain,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int((7 * 24 * time.Hour).Seconds()),
+		MaxAge:   maxAgeSession,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookie,
@@ -565,7 +592,7 @@ func setAuthCookies(w http.ResponseWriter, secure bool, domain string, bundle *a
 		Secure:   secure,
 		Domain:   domain,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int((30 * 24 * time.Hour).Seconds()),
+		MaxAge:   maxAgeRefresh,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     csrfCookie,
@@ -575,11 +602,23 @@ func setAuthCookies(w http.ResponseWriter, secure bool, domain string, bundle *a
 		Secure:   secure,
 		Domain:   domain,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int((7 * 24 * time.Hour).Seconds()),
+		MaxAge:   maxAgeCSRF,
 	})
 }
 
 func setRefreshCookies(w http.ResponseWriter, secure bool, domain string, bundle *auth.TokenBundle) {
+	rememberMe := true
+	if bundle != nil {
+		rememberMe = bundle.RememberMe
+	}
+
+	refreshMaxAge := int((30 * 24 * time.Hour).Seconds())
+	csrfMaxAge := int((30 * 24 * time.Hour).Seconds())
+	if !rememberMe {
+		refreshMaxAge = int((24 * time.Hour).Seconds())
+		csrfMaxAge = 0
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookie,
 		Value:    bundle.RefreshToken,
@@ -588,7 +627,7 @@ func setRefreshCookies(w http.ResponseWriter, secure bool, domain string, bundle
 		Secure:   secure,
 		Domain:   domain,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int((30 * 24 * time.Hour).Seconds()),
+		MaxAge:   refreshMaxAge,
 	})
 	if bundle.CSRFToken != "" {
 		http.SetCookie(w, &http.Cookie{
@@ -599,7 +638,7 @@ func setRefreshCookies(w http.ResponseWriter, secure bool, domain string, bundle
 			Secure:   secure,
 			Domain:   domain,
 			SameSite: http.SameSiteLaxMode,
-			MaxAge:   int((7 * 24 * time.Hour).Seconds()),
+			MaxAge:   csrfMaxAge,
 		})
 	}
 }
