@@ -210,6 +210,9 @@ func TestPasswordResetOptsAndCodeFlow(t *testing.T) {
 	if err != nil || user == nil {
 		t.Fatal("user not found")
 	}
+	if err := store.NewUsers(db).MarkEmailVerified(ctx, user.ID); err != nil {
+		t.Fatal(err)
+	}
 
 	// Request code delivery
 	err = svc.ForgotPasswordWithOpts(ctx, auth.ForgotPasswordOpts{
