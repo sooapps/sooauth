@@ -60,17 +60,18 @@ type TokenBundle struct {
 }
 
 type Service struct {
-	cfg     config.Config
-	users   *store.Users
-	tokens  *store.VerificationTokens
-	sess    *store.Sessions
-	refresh *store.RefreshTokens
-	audit   *store.Audit
-	mail    *mail.Mailer
-	limit   *ratelimit.Limiter
-	jwt     *appjwt.Issuer
-	mfa     *mfa.Service
-	hooks   *webhooks.Dispatcher
+	cfg           config.Config
+	users         *store.Users
+	tokens        *store.VerificationTokens
+	sess          *store.Sessions
+	refresh       *store.RefreshTokens
+	audit         *store.Audit
+	mail          *mail.Mailer
+	limit         *ratelimit.Limiter
+	jwt           *appjwt.Issuer
+	mfa           *mfa.Service
+	hooks         *webhooks.Dispatcher
+	emailSettings *store.TenantEmailSettingsStore
 }
 
 func NewService(
@@ -87,27 +88,48 @@ func NewService(
 ) *Service {
 	var mfaSvc *mfa.Service
 	var hooks *webhooks.Dispatcher
+	var emailStore *store.TenantEmailSettingsStore
 	for _, service := range services {
 		switch value := service.(type) {
 		case *mfa.Service:
 			mfaSvc = value
 		case *webhooks.Dispatcher:
 			hooks = value
+		case *store.TenantEmailSettingsStore:
+			emailStore = value
 		}
 	}
 	return &Service{
-		cfg:     cfg,
-		users:   users,
-		tokens:  tokens,
-		sess:    sess,
-		refresh: refresh,
-		audit:   audit,
-		mail:    mailer,
-		limit:   limiter,
-		jwt:     jwtIssuer,
-		mfa:     mfaSvc,
-		hooks:   hooks,
+		cfg:           cfg,
+		users:         users,
+		tokens:        tokens,
+		sess:          sess,
+		refresh:       refresh,
+		audit:         audit,
+		mail:          mailer,
+		limit:         limiter,
+		jwt:           jwtIssuer,
+		mfa:           mfaSvc,
+		hooks:         hooks,
+		emailSettings: emailStore,
 	}
+}
+
+func (s *Service) SetEmailSettingsStore(emailStore *store.TenantEmailSettingsStore) {
+	s.emailSettings = emailStore
+}
+
+func (s *Service) resolveMailer(ctx context.Context, tenantID *uuid.UUID) mail.Sender {
+	if tenantID != nil && s.emailSettings != nil {
+		settings, err := s.emailSettings.FindByTenant(ctx, *tenantID)
+		if err == nil && settings != nil && settings.Enabled {
+			cfg := s.emailSettings.ToProviderConfig(settings)
+			if sender, err := mail.NewSender(cfg); err == nil && sender != nil {
+				return sender
+			}
+		}
+	}
+	return s.mail
 }
 
 func (s *Service) SignUp(ctx context.Context, email, plainPassword, ip string) error {
@@ -598,7 +620,8 @@ func (s *Service) ForgotPasswordWithOpts(ctx context.Context, opts ForgotPasswor
 
 	tx := mail.Transactional{BrandName: brand, AppURL: s.cfg.AppURL}
 	subject, plainBody, htmlBody := tx.PasswordResetDeliveryEmail(d, opts.AppScoped)
-	_ = s.mail.SendOutbound(mail.Outbound{
+	mailer := s.resolveMailer(ctx, opts.TenantID)
+	_ = mailer.SendOutbound(mail.Outbound{
 		To:      user.Email,
 		Subject: subject,
 		Plain:   plainBody,

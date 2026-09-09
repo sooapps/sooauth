@@ -102,6 +102,31 @@ export default function AdminDocsPage() {
           </p>
         </div>
         <div>
+          <h2 className="font-sans text-[20px] font-semibold text-fg">Email</h2>
+          <p className="mt-2 text-[15px] leading-[1.6] text-fg-muted">
+            Configure custom outbound transactional email credentials for email verifications and
+            password reset links/codes. Choose between:
+          </p>
+          <ul className="mt-3 grid gap-2 text-[15px] leading-[1.6] text-fg-muted">
+            <li>
+              · <strong className="font-medium text-fg">Custom SMTP</strong> — Host, port (587, 465, 25), username, password, and TLS mode (STARTTLS, Implicit TLS, None).
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Resend</strong> — Direct transactional sending using your Resend API key.
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Postmark</strong> — Transactional sending with your Postmark Server API Token.
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Amazon SES</strong> — Transactional sending via AWS SES v2 with region, Access Key ID, and Secret Access Key.
+            </li>
+          </ul>
+          <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
+            All API keys and SMTP passwords are encrypted at rest with AES-256-GCM. Use the built-in{" "}
+            <strong className="font-medium text-fg">Send test email</strong> tool in the dashboard to verify deliverability before saving. If custom email is disabled or unconfigured, Sooauth seamlessly falls back to platform SMTP.
+          </p>
+        </div>
+        <div>
           <h2 className="font-sans text-[20px] font-semibold text-fg">Audit log</h2>
           <p className="mt-2 text-[15px] leading-[1.6] text-fg-muted">
             Sign-in, sign-up, token events for security review.

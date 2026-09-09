@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/sooapps/sooauth/server/internal/auth"
 	"github.com/sooapps/sooauth/server/internal/billing"
 	"github.com/sooapps/sooauth/server/internal/emailverify"
+	"github.com/sooapps/sooauth/server/internal/mail"
 	"github.com/sooapps/sooauth/server/internal/passwordpolicy"
 	"github.com/sooapps/sooauth/server/internal/providers"
 	"github.com/sooapps/sooauth/server/internal/social"
@@ -1109,3 +1111,330 @@ func (s *Server) themeView(ctx context.Context) store.Theme {
 	}
 	return theme
 }
+
+func (s *Server) handleDashboardEmailGet(w http.ResponseWriter, r *http.Request) {
+	dash, ok := s.requireDashboard(w, r)
+	if !ok {
+		return
+	}
+
+	res := map[string]any{
+		"enabled":             false,
+		"provider":            "smtp",
+		"from_name":           "",
+		"from_email":          "",
+		"reply_to":            "",
+		"smtp_host":           "",
+		"smtp_port":           587,
+		"smtp_user":           "",
+		"smtp_has_password":   false,
+		"smtp_tls_mode":       "starttls",
+		"has_api_key":         false,
+		"aws_access_key_id":   "",
+		"aws_has_secret_key":  false,
+		"aws_region":          "us-east-1",
+		"platform_from":       s.cfg.SMTPFrom,
+		"platform_configured": s.cfg.SMTPConfigured(),
+	}
+
+	if s.emailSettings != nil {
+		settings, err := s.emailSettings.FindByTenant(r.Context(), dash.tenant.ID)
+		if err == nil && settings != nil {
+			res["enabled"] = settings.Enabled
+			res["provider"] = settings.Provider
+			res["from_name"] = settings.FromName
+			res["from_email"] = settings.FromEmail
+			res["reply_to"] = settings.ReplyTo
+			res["smtp_host"] = settings.SMTPHost
+			if settings.SMTPPort > 0 {
+				res["smtp_port"] = settings.SMTPPort
+			}
+			res["smtp_user"] = settings.SMTPUser
+			res["smtp_has_password"] = strings.TrimSpace(settings.SMTPPasswordEncrypted) != ""
+			if settings.SMTPTLSMode != "" {
+				res["smtp_tls_mode"] = settings.SMTPTLSMode
+			}
+			res["has_api_key"] = strings.TrimSpace(settings.APIKeyEncrypted) != ""
+			res["aws_access_key_id"] = settings.AWSAccessKeyID
+			res["aws_has_secret_key"] = strings.TrimSpace(settings.AWSSecretKeyEncrypted) != ""
+			if settings.AWSRegion != "" {
+				res["aws_region"] = settings.AWSRegion
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (s *Server) handleDashboardEmailPut(w http.ResponseWriter, r *http.Request) {
+	dash, ok := s.requireDashboard(w, r)
+	if !ok {
+		return
+	}
+
+	var body struct {
+		Enabled        bool    `json:"enabled"`
+		Provider       string  `json:"provider"`
+		FromName       string  `json:"from_name"`
+		FromEmail      string  `json:"from_email"`
+		ReplyTo        string  `json:"reply_to"`
+		SMTPHost       string  `json:"smtp_host"`
+		SMTPPort       int     `json:"smtp_port"`
+		SMTPUser       string  `json:"smtp_user"`
+		SMTPPassword   *string `json:"smtp_password"`
+		SMTPTLSMode    string  `json:"smtp_tls_mode"`
+		APIKey         *string `json:"api_key"`
+		AWSAccessKeyID string  `json:"aws_access_key_id"`
+		AWSSecretKey   *string `json:"aws_secret_key"`
+		AWSRegion      string  `json:"aws_region"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+
+	provider := strings.ToLower(strings.TrimSpace(body.Provider))
+	if provider == "" {
+		provider = "smtp"
+	}
+	if provider != "smtp" && provider != "resend" && provider != "postmark" && provider != "ses" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_provider", "message": "Provider must be smtp, resend, postmark, or ses"})
+		return
+	}
+
+	if body.Enabled {
+		if strings.TrimSpace(body.FromEmail) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "from_email_required", "message": "Sender from_email is required when custom email is enabled"})
+			return
+		}
+	}
+
+	if s.emailSettings == nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "email_store_unavailable"})
+		return
+	}
+
+	var smtpPass *string
+	if body.SMTPPassword != nil && strings.TrimSpace(*body.SMTPPassword) != "" {
+		trimmed := strings.TrimSpace(*body.SMTPPassword)
+		smtpPass = &trimmed
+	}
+	var apiKey *string
+	if body.APIKey != nil && strings.TrimSpace(*body.APIKey) != "" {
+		trimmed := strings.TrimSpace(*body.APIKey)
+		apiKey = &trimmed
+	}
+	var awsSecret *string
+	if body.AWSSecretKey != nil && strings.TrimSpace(*body.AWSSecretKey) != "" {
+		trimmed := strings.TrimSpace(*body.AWSSecretKey)
+		awsSecret = &trimmed
+	}
+
+	err := s.emailSettings.Upsert(r.Context(), store.TenantEmailSettingsInput{
+		TenantID:          dash.tenant.ID,
+		Enabled:           body.Enabled,
+		Provider:          provider,
+		FromName:          body.FromName,
+		FromEmail:         body.FromEmail,
+		ReplyTo:           body.ReplyTo,
+		SMTPHost:          body.SMTPHost,
+		SMTPPort:          body.SMTPPort,
+		SMTPUser:          body.SMTPUser,
+		SMTPPasswordPlain: smtpPass,
+		SMTPTLSMode:       body.SMTPTLSMode,
+		APIKeyPlain:       apiKey,
+		AWSAccessKeyID:    body.AWSAccessKeyID,
+		AWSSecretKeyPlain: awsSecret,
+		AWSRegion:         body.AWSRegion,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save_failed", "message": err.Error()})
+		return
+	}
+
+	s.audit.Log(r.Context(), &dash.user.ID, "tenant_email_updated", map[string]any{
+		"tenant_id": dash.tenant.ID.String(),
+		"provider":  provider,
+		"enabled":   body.Enabled,
+	}, clientIP(r))
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "saved"})
+}
+
+func (s *Server) handleDashboardEmailTest(w http.ResponseWriter, r *http.Request) {
+	dash, ok := s.requireDashboard(w, r)
+	if !ok {
+		return
+	}
+
+	var body struct {
+		To             string  `json:"to"`
+		Provider       string  `json:"provider"`
+		FromName       string  `json:"from_name"`
+		FromEmail      string  `json:"from_email"`
+		ReplyTo        string  `json:"reply_to"`
+		SMTPHost       string  `json:"smtp_host"`
+		SMTPPort       int     `json:"smtp_port"`
+		SMTPUser       string  `json:"smtp_user"`
+		SMTPPassword   *string `json:"smtp_password"`
+		SMTPTLSMode    string  `json:"smtp_tls_mode"`
+		APIKey         *string `json:"api_key"`
+		AWSAccessKeyID string  `json:"aws_access_key_id"`
+		AWSSecretKey   *string `json:"aws_secret_key"`
+		AWSRegion      string  `json:"aws_region"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
+	to := strings.TrimSpace(body.To)
+	if to == "" {
+		to = dash.user.Email
+	}
+
+	var saved *store.TenantEmailSettings
+	if s.emailSettings != nil {
+		saved, _ = s.emailSettings.FindByTenant(r.Context(), dash.tenant.ID)
+	}
+
+	provider := strings.ToLower(strings.TrimSpace(body.Provider))
+	if provider == "" && saved != nil {
+		provider = saved.Provider
+	}
+	if provider == "" {
+		provider = "smtp"
+	}
+
+	fromName := strings.TrimSpace(body.FromName)
+	if fromName == "" && saved != nil {
+		fromName = saved.FromName
+	}
+	if fromName == "" {
+		fromName = dash.tenant.Name
+	}
+
+	fromEmail := strings.TrimSpace(body.FromEmail)
+	if fromEmail == "" && saved != nil {
+		fromEmail = saved.FromEmail
+	}
+	if fromEmail == "" {
+		fromEmail = s.cfg.SMTPFrom
+	}
+
+	replyTo := strings.TrimSpace(body.ReplyTo)
+	if replyTo == "" && saved != nil {
+		replyTo = saved.ReplyTo
+	}
+
+	smtpHost := strings.TrimSpace(body.SMTPHost)
+	if smtpHost == "" && saved != nil {
+		smtpHost = saved.SMTPHost
+	}
+
+	smtpPort := body.SMTPPort
+	if smtpPort <= 0 && saved != nil {
+		smtpPort = saved.SMTPPort
+	}
+	if smtpPort <= 0 {
+		smtpPort = 587
+	}
+
+	smtpUser := strings.TrimSpace(body.SMTPUser)
+	if smtpUser == "" && saved != nil {
+		smtpUser = saved.SMTPUser
+	}
+
+	smtpPass := ""
+	if body.SMTPPassword != nil && *body.SMTPPassword != "" {
+		smtpPass = *body.SMTPPassword
+	} else if saved != nil && s.emailSettings != nil {
+		smtpPass = s.emailSettings.DecryptSMTPPassword(saved)
+	}
+
+	smtpTLSMode := strings.TrimSpace(body.SMTPTLSMode)
+	if smtpTLSMode == "" && saved != nil {
+		smtpTLSMode = saved.SMTPTLSMode
+	}
+	if smtpTLSMode == "" {
+		smtpTLSMode = "starttls"
+	}
+
+	apiKey := ""
+	if body.APIKey != nil && *body.APIKey != "" {
+		apiKey = *body.APIKey
+	} else if saved != nil && s.emailSettings != nil {
+		apiKey = s.emailSettings.DecryptAPIKey(saved)
+	}
+
+	awsAccess := strings.TrimSpace(body.AWSAccessKeyID)
+	if awsAccess == "" && saved != nil {
+		awsAccess = saved.AWSAccessKeyID
+	}
+
+	awsSecret := ""
+	if body.AWSSecretKey != nil && *body.AWSSecretKey != "" {
+		awsSecret = *body.AWSSecretKey
+	} else if saved != nil && s.emailSettings != nil {
+		awsSecret = s.emailSettings.DecryptAWSSecretKey(saved)
+	}
+
+	awsRegion := strings.TrimSpace(body.AWSRegion)
+	if awsRegion == "" && saved != nil {
+		awsRegion = saved.AWSRegion
+	}
+	if awsRegion == "" {
+		awsRegion = "us-east-1"
+	}
+
+	sender, err := mail.NewSender(mail.ProviderConfig{
+		Provider:     provider,
+		FromName:     fromName,
+		FromEmail:    fromEmail,
+		ReplyTo:      replyTo,
+		BrandName:    fromName,
+		SMTPHost:     smtpHost,
+		SMTPPort:     smtpPort,
+		SMTPUser:     smtpUser,
+		SMTPPassword: smtpPass,
+		SMTPTLSMode:  smtpTLSMode,
+		APIKey:       apiKey,
+		AWSAccessKey: awsAccess,
+		AWSSecretKey: awsSecret,
+		AWSRegion:    awsRegion,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_configuration", "message": err.Error()})
+		return
+	}
+
+	nowStr := time.Now().UTC().Format(time.RFC1123)
+	msg := mail.Outbound{
+		To:      to,
+		Subject: fmt.Sprintf("[%s] Test email delivery verification", fromName),
+		Plain: fmt.Sprintf("Hi,\n\nThis is a diagnostic test email from %s to verify your transactional email delivery configuration.\n\nProvider: %s\nTimestamp: %s\n\nIf you received this message, your outbound email settings are working correctly.", fromName, strings.ToUpper(provider), nowStr),
+		HTML: fmt.Sprintf(`<div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #C4C4C4;border-radius:4px;color:#051B23">
+<h2 style="margin-top:0;font-size:18px;font-weight:700">Email Delivery Verified ✓</h2>
+<p style="font-size:14px;color:#5D6B70;line-height:1.5">This is a diagnostic test email from <strong>%s</strong> to verify your outbound transactional email provider configuration.</p>
+<div style="background:#F5F5F5;border:1px solid #E0E0E0;padding:12px 16px;border-radius:4px;font-size:13px;line-height:1.6">
+<div><strong>Provider:</strong> %s</div>
+<div><strong>Recipient:</strong> %s</div>
+<div><strong>Timestamp:</strong> %s</div>
+</div>
+<p style="font-size:13px;color:#5D6B70;margin-top:16px">If you received this message, your transactional email settings are operational.</p>
+</div>`, fromName, strings.ToUpper(provider), to, nowStr),
+	}
+
+	if err := sender.SendOutbound(msg); err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "delivery_failed", "message": err.Error()})
+		return
+	}
+
+	s.audit.Log(r.Context(), &dash.user.ID, "tenant_email_test_sent", map[string]any{
+		"tenant_id": dash.tenant.ID.String(),
+		"provider":  provider,
+		"to":        to,
+	}, clientIP(r))
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": fmt.Sprintf("Test email sent to %s", to),
+	})
+}
+

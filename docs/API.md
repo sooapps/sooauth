@@ -194,6 +194,119 @@ challenge and an authenticator code or backup code to `/auth/mfa/verify`.
 | POST | `/v1/widget/exchange` | Exchange a social callback code |
 | GET | `/v1/widget/embed.js` | Download the drop-in widget |
 
+## Tenant Email & Transactional Provider Settings (Admin API)
+
+Tenant administrators can configure custom transactional email providers for outbound verification emails and password reset links/codes, overriding the platform default SMTP.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/dashboard/api/email` | Get tenant email configuration (sensitive credentials masked) |
+| PUT | `/dashboard/api/email` | Update email provider configuration and credentials |
+| POST | `/dashboard/api/email/test` | Send a diagnostic test email to verify delivery |
+
+Requires tenant admin authentication (session cookie + `X-CSRF-Token` header).
+
+### Get Email Settings
+
+`GET /dashboard/api/email`
+
+Response:
+```json
+{
+  "enabled": true,
+  "provider": "smtp",
+  "from_name": "Acme Auth",
+  "from_email": "auth@acme.com",
+  "reply_to": "support@acme.com",
+  "smtp_host": "smtp.mailgun.org",
+  "smtp_port": 587,
+  "smtp_user": "postmaster@acme.com",
+  "smtp_password_set": true,
+  "smtp_tls_mode": "starttls",
+  "resend_api_key_set": false,
+  "postmark_token_set": false,
+  "ses_region": "",
+  "ses_access_key_id": "",
+  "ses_secret_access_key_set": false
+}
+```
+
+### Update Email Settings
+
+`PUT /dashboard/api/email`
+
+* Supported providers: `"smtp"`, `"resend"`, `"postmark"`, `"ses"`.
+* Passwords and secret keys are encrypted at rest with AES-256-GCM.
+* If a password/token field is sent as empty string or omitted when already set, the existing stored encrypted secret is retained.
+
+Example (Custom SMTP):
+```json
+{
+  "enabled": true,
+  "provider": "smtp",
+  "from_name": "Acme Auth",
+  "from_email": "auth@acme.com",
+  "reply_to": "support@acme.com",
+  "smtp_host": "smtp.mailgun.org",
+  "smtp_port": 587,
+  "smtp_user": "postmaster@acme.com",
+  "smtp_password": "super-secret-smtp-password",
+  "smtp_tls_mode": "starttls"
+}
+```
+
+Example (Resend):
+```json
+{
+  "enabled": true,
+  "provider": "resend",
+  "from_name": "Acme Auth",
+  "from_email": "auth@acme.com",
+  "resend_api_key": "re_123456789"
+}
+```
+
+Example (AWS SES):
+```json
+{
+  "enabled": true,
+  "provider": "ses",
+  "from_name": "Acme Auth",
+  "from_email": "auth@acme.com",
+  "ses_region": "us-east-1",
+  "ses_access_key_id": "AKIAIOSFODNN7EXAMPLE",
+  "ses_secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+}
+```
+
+### Send Test Email
+
+`POST /dashboard/api/email/test`
+
+Tests deliverability using the provided configuration before saving, or tests the currently saved settings.
+
+Request:
+```json
+{
+  "recipient": "admin@example.com",
+  "settings": {
+    "enabled": true,
+    "provider": "resend",
+    "from_name": "Acme Auth",
+    "from_email": "auth@acme.com",
+    "resend_api_key": "re_123456789"
+  }
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Test email sent successfully to admin@example.com"
+}
+```
+
 ## Errors and limits
 
 Errors use a stable machine-readable `error` field and may include a human
@@ -203,3 +316,4 @@ missing credentials, `403` verification/MFA/CSRF required, `404` not found,
 
 Access tokens are short-lived and refresh tokens rotate on use. API consumers
 should cache discovery and JWKS responses according to their HTTP cache headers.
+
