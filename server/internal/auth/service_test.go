@@ -192,3 +192,52 @@ func TestJWKSValidatesAccessToken(t *testing.T) {
 		t.Fatal("expected at least one jwk")
 	}
 }
+
+func TestPasswordResetOptsAndCodeFlow(t *testing.T) {
+	svc, db, _ := testService(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	email := "reset-code-test@sooauth.local"
+	_, _ = db.Exec(ctx, `DELETE FROM users WHERE email = $1`, email)
+
+	if err := svc.SignUp(ctx, email, "old-password-123", "127.0.0.1"); err != nil {
+		t.Fatal(err)
+	}
+	user, _, err := store.NewUsers(db).FindByEmail(ctx, email)
+	if err != nil || user == nil {
+		t.Fatal("user not found")
+	}
+
+	// Request code delivery
+	err = svc.ForgotPasswordWithOpts(ctx, auth.ForgotPasswordOpts{
+		Email:    email,
+		IP:       "127.0.0.1",
+		Delivery: "code",
+	})
+	if err != nil {
+		t.Fatalf("ForgotPasswordWithOpts failed: %v", err)
+	}
+
+	// Query token from database
+	var codeHash string
+	err = db.QueryRow(ctx, `
+		SELECT token_hash FROM verification_tokens
+		WHERE user_id = $1 AND type = 'password_reset_code' AND used_at IS NULL
+	`, user.ID).Scan(&codeHash)
+	if err != nil {
+		t.Fatalf("code token not found in db: %v", err)
+	}
+
+	// Try with wrong code
+	err = svc.ResetPasswordWithCode(ctx, email, "999999", "new-password-123", "127.0.0.1")
+	if err == nil {
+		t.Fatal("expected error with wrong code, got nil")
+	}
+
+	// Try with invalid password length (< 8)
+	err = svc.ResetPasswordWithCode(ctx, email, "000000", "short", "127.0.0.1")
+	if err == nil {
+		t.Fatal("expected weak password error, got nil")
+	}
+}

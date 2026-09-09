@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -50,6 +51,40 @@ func (s *VerificationTokens) Consume(ctx context.Context, tokenType, tokenHash s
 		WHERE type = $1 AND token_hash = $2 AND used_at IS NULL AND expires_at > now()
 		FOR UPDATE
 	`, tokenType, tokenHash).Scan(&id, &userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, ErrTokenInvalid
+		}
+		return uuid.Nil, err
+	}
+
+	_, err = tx.Exec(ctx, `UPDATE verification_tokens SET used_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, err
+	}
+	return userID, nil
+}
+
+func (s *VerificationTokens) ConsumeCode(ctx context.Context, email, tokenType, tokenHash string) (uuid.UUID, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	email = strings.ToLower(strings.TrimSpace(email))
+	var id uuid.UUID
+	var userID uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT id, user_id
+		FROM verification_tokens
+		WHERE type = $1 AND lower(email) = $2 AND token_hash = $3 AND used_at IS NULL AND expires_at > now()
+		FOR UPDATE
+	`, tokenType, email, tokenHash).Scan(&id, &userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return uuid.Nil, ErrTokenInvalid

@@ -67,20 +67,25 @@ func (t Transactional) VerificationDeliveryEmail(d VerificationDelivery, appScop
 }
 
 type verificationLayout struct {
-	Brand   string
-	Title   string
-	Lead    string
-	LinkURL string
-	Code    string
-	Note    string
-	Footer  string
-	AppURL  string
+	Brand      string
+	Title      string
+	Lead       string
+	ButtonText string
+	LinkURL    string
+	Code       string
+	Note       string
+	Footer     string
+	AppURL     string
 }
 
 func layoutVerificationEmail(l verificationLayout) string {
 	accent := "#E8FF3F"
 	hasLink := strings.TrimSpace(l.LinkURL) != ""
 	hasCode := strings.TrimSpace(l.Code) != ""
+	btnText := strings.TrimSpace(l.ButtonText)
+	if btnText == "" {
+		btnText = "Confirm email"
+	}
 
 	var body strings.Builder
 	body.WriteString(fmt.Sprintf(`<!DOCTYPE html>
@@ -125,7 +130,7 @@ func layoutVerificationEmail(l verificationLayout) string {
 		body.WriteString(fmt.Sprintf(`
           <tr>
             <td style="padding:28px 32px 8px;" align="center">
-              <a href="%s" style="display:inline-block;background:%s;color:#051B23;text-decoration:none;font-size:15px;font-weight:600;padding:14px 28px;border-radius:10px;">Confirm email</a>
+              <a href="%s" style="display:inline-block;background:%s;color:#051B23;text-decoration:none;font-size:15px;font-weight:600;padding:14px 28px;border-radius:10px;">%s</a>
             </td>
           </tr>
           <tr>
@@ -133,6 +138,7 @@ func layoutVerificationEmail(l verificationLayout) string {
           </tr>`,
 			html.EscapeString(l.LinkURL),
 			accent,
+			html.EscapeString(btnText),
 			html.EscapeString(l.LinkURL),
 			html.EscapeString(l.LinkURL),
 		))
@@ -159,4 +165,72 @@ func layoutVerificationEmail(l verificationLayout) string {
 	))
 
 	return body.String()
+}
+
+type PasswordResetDelivery struct {
+	LinkURL string
+	Code    string
+}
+
+func (t Transactional) PasswordResetDeliveryEmail(d PasswordResetDelivery, appScoped bool) (subject, plain, htmlBody string) {
+	brand := t.brand()
+	hasCode := strings.TrimSpace(d.Code) != ""
+
+	subject = fmt.Sprintf("Reset your %s password", brand)
+
+	var lead, footer string
+	if appScoped {
+		footer = fmt.Sprintf("Authentication for %s is provided by sooauth. If you didn't request a password reset, you can safely ignore this email.", brand)
+	} else {
+		footer = "If you didn't request a password reset, you can safely ignore this email."
+	}
+
+	if hasCode {
+		lead = fmt.Sprintf("We received a request to reset your %s password. Enter this 6-digit code in the app to set a new password.", brand)
+		plain = fmt.Sprintf(`Hi,
+
+We received a request to reset your %s password. Enter this 6-digit code in the app:
+
+Your password reset code: %s
+
+This code expires in 15 minutes. If you didn't request this, ignore this email.
+
+— %s
+%s`, brand, d.Code, brand, strings.TrimSuffix(t.AppURL, "/"))
+
+		htmlBody = layoutVerificationEmail(verificationLayout{
+			Brand:   brand,
+			Title:   "Reset your password",
+			Lead:    lead,
+			Code:    d.Code,
+			Note:    "This code expires in 15 minutes.",
+			Footer:  footer,
+			AppURL:  strings.TrimSuffix(t.AppURL, "/"),
+		})
+	} else {
+		lead = fmt.Sprintf("We received a request to reset your %s password. Tap the button below to choose a new password.", brand)
+		plain = fmt.Sprintf(`Hi,
+
+We received a request to reset your %s password. Open this link to choose a new password:
+
+%s
+
+This link expires in 1 hour. If you didn't request a reset, ignore this email.
+
+— %s
+%s`, brand, d.LinkURL, brand, strings.TrimSuffix(t.AppURL, "/"))
+
+		htmlBody = layoutVerificationEmail(verificationLayout{
+			Brand:      brand,
+			Title:      "Reset your password",
+			Lead:       lead,
+			ButtonText: "Reset password",
+			LinkURL:    d.LinkURL,
+			Note:       "This link expires in 1 hour.",
+			Footer:     footer,
+			AppURL:     strings.TrimSuffix(t.AppURL, "/"),
+		})
+	}
+
+	return subject, plain, htmlBody
 }

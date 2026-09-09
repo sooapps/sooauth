@@ -53,3 +53,35 @@ func TestBuildMessage_multipart(t *testing.T) {
 		t.Fatal("missing parts")
 	}
 }
+
+func TestPasswordResetDeliveryEmail(t *testing.T) {
+	tx := Transactional{BrandName: "AcmeApp", AppURL: "https://auth.acme.local"}
+
+	// Test code only delivery
+	subCode, plainCode, htmlCode := tx.PasswordResetDeliveryEmail(PasswordResetDelivery{
+		Code: "654321",
+	}, true)
+	if !strings.Contains(subCode, "AcmeApp") {
+		t.Fatalf("expected brand in subject: %q", subCode)
+	}
+	if !strings.Contains(plainCode, "654321") || strings.Contains(plainCode, "Open this link") {
+		t.Fatalf("expected code only in plain text: %q", plainCode)
+	}
+	if !strings.Contains(htmlCode, "654321") || strings.Contains(htmlCode, "Confirm email") {
+		t.Fatalf("html incorrect: %q", htmlCode)
+	}
+
+	// Test link only delivery
+	subLink, plainLink, htmlLink := tx.PasswordResetDeliveryEmail(PasswordResetDelivery{
+		LinkURL: "https://auth.acme.local/auth/reset-password?token=secret123",
+	}, false)
+	if !strings.Contains(subLink, "AcmeApp") {
+		t.Fatalf("expected brand in subject: %q", subLink)
+	}
+	if !strings.Contains(plainLink, "secret123") || strings.Contains(plainLink, "Your password reset code") {
+		t.Fatalf("expected link only in plain text: %q", plainLink)
+	}
+	if !strings.Contains(htmlLink, "Reset password") || !strings.Contains(htmlLink, "secret123") {
+		t.Fatalf("html missing reset button or link: %q", htmlLink)
+	}
+}

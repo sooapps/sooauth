@@ -7,8 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/sooapps/sooauth/server/internal/accounts"
 	"github.com/sooapps/sooauth/server/internal/auth"
+	"github.com/sooapps/sooauth/server/internal/emailverify"
 	"github.com/sooapps/sooauth/server/internal/mfa"
 	"github.com/sooapps/sooauth/server/internal/passwordpolicy"
 	"github.com/sooapps/sooauth/server/internal/store"
@@ -355,15 +358,79 @@ func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
+	setPublicCORS(w, r)
+	if corsPreflight(w, r) {
+		return
+	}
+
 	var body struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		ClientID string `json:"client_id"`
+		TenantID string `json:"tenant_id"`
+		ReturnTo string `json:"return_to"`
+		Delivery string `json:"delivery"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
 		return
 	}
 
-	err := s.auth.ForgotPassword(r.Context(), body.Email, clientIP(r))
+	clientID := strings.TrimSpace(body.ClientID)
+	var tenantID *uuid.UUID
+	var returnTo string
+	brandName := s.cfg.BrandName
+	appScoped := false
+	delivery := strings.ToLower(strings.TrimSpace(body.Delivery))
+
+	if clientID != "" {
+		client, err := s.oauthClients.FindByClientID(r.Context(), clientID)
+		if err == nil && client != nil && client.TenantID != nil {
+			tenantID = client.TenantID
+			appScoped = true
+			if tenant, err := s.tenants.FindByID(r.Context(), *client.TenantID); err == nil && tenant != nil {
+				theme, _ := s.theme.GetByTenant(r.Context(), *client.TenantID)
+				brandName = appDisplayBrand(tenant, theme, client)
+				if delivery == "" {
+					if tenant.VerifyDelivery() == emailverify.DeliveryCode {
+						delivery = "code"
+					} else {
+						delivery = "link"
+					}
+				}
+			}
+			returnTo = resolveAppReturnTo(body.ReturnTo, s.cfg.AppURL, client)
+		}
+	} else if body.TenantID != "" {
+		if parsed, err := uuid.Parse(body.TenantID); err == nil {
+			tenantID = &parsed
+			appScoped = true
+			if tenant, err := s.tenants.FindByID(r.Context(), parsed); err == nil && tenant != nil {
+				brandName = tenant.Name
+				if delivery == "" {
+					if tenant.VerifyDelivery() == emailverify.DeliveryCode {
+						delivery = "code"
+					} else {
+						delivery = "link"
+					}
+				}
+			}
+		}
+	}
+
+	if delivery == "" {
+		delivery = "link"
+	}
+
+	err := s.auth.ForgotPasswordWithOpts(r.Context(), auth.ForgotPasswordOpts{
+		Email:     body.Email,
+		IP:        clientIP(r),
+		TenantID:  tenantID,
+		ClientID:  clientID,
+		ReturnTo:  returnTo,
+		Delivery:  delivery,
+		BrandName: brandName,
+		AppScoped: appScoped,
+	})
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
 		return
@@ -373,24 +440,49 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{
-		"message": "If an account exists for that email, we sent reset instructions.",
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message":  "If an account exists for that email, we sent reset instructions.",
+		"delivery": delivery,
 	})
 }
 
 func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
+	setPublicCORS(w, r)
+	if corsPreflight(w, r) {
+		return
+	}
+
 	var body struct {
 		Token    string `json:"token"`
 		Password string `json:"password"`
+		Email    string `json:"email"`
+		Code     string `json:"code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
 		return
 	}
 
-	err := s.auth.ResetPassword(r.Context(), body.Token, body.Password, clientIP(r))
+	code := strings.TrimSpace(body.Code)
+	tokenStr := strings.TrimSpace(body.Token)
+	email := strings.TrimSpace(body.Email)
+
+	var err error
+	if code != "" && email != "" {
+		err = s.auth.ResetPasswordWithCode(r.Context(), email, code, body.Password, clientIP(r))
+	} else if tokenStr != "" {
+		err = s.auth.ResetPassword(r.Context(), tokenStr, body.Password, clientIP(r))
+	} else {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "token_or_code_required"})
+		return
+	}
+
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
+		return
+	}
+	if errors.Is(err, passwordpolicy.ErrWeak) || (err != nil && strings.Contains(err.Error(), "at least")) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "weak_password", "message": err.Error()})
 		return
 	}
 	if err != nil {
