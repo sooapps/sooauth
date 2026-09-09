@@ -32,7 +32,17 @@ func TestDecryptRejectsTampering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	protected = protected[:len(protected)-1] + "A"
+	chars := []byte(protected)
+	if len(chars) <= len(prefix) {
+		t.Fatal("expected non-empty ciphertext payload")
+	}
+	i := len(chars) - 2
+	if chars[i] == 'A' {
+		chars[i] = 'B'
+	} else {
+		chars[i] = 'A'
+	}
+	protected = string(chars)
 	if _, err := cipher.Decrypt(protected); err != ErrInvalidCiphertext {
 		t.Fatalf("expected tampering error, got %v", err)
 	}

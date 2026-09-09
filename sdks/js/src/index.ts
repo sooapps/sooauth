@@ -104,6 +104,49 @@ export function createSooauthClient(options: SooauthClientOptions) {
     return res.json();
   }
 
+  async function getPasswordStatus(accessToken?: string): Promise<{ has_password: boolean }> {
+    const token = accessToken ?? getSession()?.accessToken;
+    if (!token) throw new Error("unauthenticated");
+    const res = await fetch(`${issuer}/auth/account/password`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || "password_status_failed");
+    return body as { has_password: boolean };
+  }
+
+  async function changePassword(currentPassword: string, newPassword: string, accessToken?: string): Promise<{ message: string }> {
+    const token = accessToken ?? getSession()?.accessToken;
+    if (!token) throw new Error("unauthenticated");
+    const res = await fetch(`${issuer}/auth/account/password`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || body.error || "password_change_failed");
+    return body as { message: string };
+  }
+
+  async function setPassword(newPassword: string, accessToken?: string): Promise<{ message: string }> {
+    const token = accessToken ?? getSession()?.accessToken;
+    if (!token) throw new Error("unauthenticated");
+    const res = await fetch(`${issuer}/auth/account/password/set`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ new_password: newPassword }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || body.error || "password_set_failed");
+    return body as { message: string };
+  }
+
   async function signOut() {
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem("sooauth.pkce");
@@ -118,9 +161,14 @@ export function createSooauthClient(options: SooauthClientOptions) {
     handleCallback,
     getSession,
     getUserInfo,
+    getPasswordStatus,
+    changePassword,
+    setPassword,
     signOut,
   };
 }
+
+export type SooauthClient = ReturnType<typeof createSooauthClient>;
 
 async function createPKCE() {
   const array = new Uint8Array(32);

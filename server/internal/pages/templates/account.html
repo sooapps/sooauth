@@ -46,11 +46,11 @@
   </details>
 
   <details class="account-section">
-    <summary>Change password</summary>
+    <summary id="account-password-summary">Change password</summary>
     <form id="account-password-form" class="stack">
-    <label>Current password<input name="current_password" type="password" autocomplete="current-password" required /></label>
+    <label id="account-current-password-label">Current password<input name="current_password" type="password" autocomplete="current-password" required /></label>
     <label>New password<input name="new_password" type="password" autocomplete="new-password" minlength="8" required /></label>
-    <button type="submit">Change password</button>
+    <button type="submit" id="account-password-btn">Change password</button>
     </form>
   </details>
 </section>
@@ -131,9 +131,46 @@
       show('MFA disabled.');
     } catch (e) { show(e.message, true); }
   };
+  let hasPassword = true;
+  const checkPasswordStatus = async () => {
+    try {
+      const res = await request('/auth/account/password');
+      hasPassword = Boolean(res.has_password);
+      const summary = document.querySelector('#account-password-summary');
+      const curLabel = document.querySelector('#account-current-password-label');
+      const curInput = curLabel?.querySelector('input');
+      const btn = document.querySelector('#account-password-btn');
+      if (!hasPassword) {
+        if (summary) summary.textContent = 'Set password';
+        if (curLabel) curLabel.hidden = true;
+        if (curInput) curInput.required = false;
+        if (btn) btn.textContent = 'Set password';
+      } else {
+        if (summary) summary.textContent = 'Change password';
+        if (curLabel) curLabel.hidden = false;
+        if (curInput) curInput.required = true;
+        if (btn) btn.textContent = 'Change password';
+      }
+    } catch (_) {}
+  };
   document.querySelector('#revoke-all-sessions').onclick = async () => { if (!confirm('Revoke every session, including this one?')) return; try { await request('/auth/account/sessions', {method: 'DELETE'}); show('All sessions revoked. Sign in again to continue.'); } catch (e) { show(e.message, true); } };
-  document.querySelector('#account-password-form').onsubmit = async event => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.target)); try { await request('/auth/account/password', {method: 'PUT', body: JSON.stringify(data)}); show('Password changed. Sign in again to continue.'); event.target.reset(); } catch (e) { show(e.message, true); } };
+  document.querySelector('#account-password-form').onsubmit = async event => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.target));
+    try {
+      if (hasPassword) {
+        await request('/auth/account/password', {method: 'PUT', body: JSON.stringify(data)});
+        show('Password changed.');
+      } else {
+        await request('/auth/account/password/set', {method: 'POST', body: JSON.stringify({new_password: data.new_password})});
+        show('Password set successfully.');
+        await checkPasswordStatus();
+      }
+      event.target.reset();
+    } catch (e) { show(e.message, true); }
+  };
   load();
+  checkPasswordStatus();
 })();
 </script>
 {{end}}

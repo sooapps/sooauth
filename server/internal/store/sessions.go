@@ -102,3 +102,12 @@ func (s *Sessions) RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
 	`, userID)
 	return err
 }
+
+func (s *Sessions) RevokeOthersForUser(ctx context.Context, userID, exceptSessionID uuid.UUID) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE sessions SET revoked_at = now()
+		WHERE user_id = $1 AND id != $2 AND revoked_at IS NULL
+	`, userID, exceptSessionID)
+	return err
+}
+

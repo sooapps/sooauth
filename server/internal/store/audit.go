@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"net"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,6 +23,10 @@ func (a *Audit) Log(ctx context.Context, userID *uuid.UUID, action string, meta 
 	var uid any
 	if userID != nil {
 		uid = *userID
+	}
+	ip = strings.TrimSpace(ip)
+	if host, _, err := net.SplitHostPort(ip); err == nil {
+		ip = host
 	}
 	_, _ = a.db.Exec(ctx, `
 		INSERT INTO audit_log (user_id, action, meta, ip, created_at)

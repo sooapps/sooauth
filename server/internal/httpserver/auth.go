@@ -3,6 +3,7 @@ package httpserver
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -319,6 +320,18 @@ func (s *Server) handleMFAVerify(w http.ResponseWriter, r *http.Request) {
 		"id": bundle.User.ID, "email": bundle.User.Email, "access_token": bundle.AccessToken,
 		"refresh_token": bundle.RefreshToken, "expires_in": bundle.ExpiresIn, "csrf_token": bundle.CSRFToken, "token_type": "Bearer",
 	})
+}
+
+func (s *Server) requireAuthUser(w http.ResponseWriter, r *http.Request) (*store.User, bool) {
+	user, err := s.currentUser(r)
+	if err != nil || user == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthenticated"})
+		return nil, false
+	}
+	if !accountCSRFValid(w, r) {
+		return nil, false
+	}
+	return user, true
 }
 
 func (s *Server) requirePlatformUser(w http.ResponseWriter, r *http.Request) (*store.User, bool) {
@@ -643,7 +656,14 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 
 func clientIP(r *http.Request) string {
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		if idx := strings.Index(fwd, ","); idx != -1 {
+			fwd = strings.TrimSpace(fwd[:idx])
+		}
 		return fwd
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		return host
 	}
 	return r.RemoteAddr
 }
