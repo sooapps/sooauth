@@ -34,6 +34,9 @@ export function SiteHeader() {
           <Link href="/docs" className={buttonClass("ghost", "sm")}>
             Docs
           </Link>
+          <Link href="/playground" className={buttonClass("ghost", "sm")}>
+            Playground
+          </Link>
           <Link
             href="/blog"
             className={buttonClass("ghost", "sm", "hidden sm:inline-flex")}

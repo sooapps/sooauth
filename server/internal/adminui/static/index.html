@@ -19,8 +19,8 @@
       --border: #C4C4C4;
       --text: #051B23;
       --muted: #5D6B70;
-      --accent: #E8FF3F;
-      --accent-soft: rgba(232, 255, 63, 0.35);
+      --accent: #FF3B3B;
+      --accent-soft: rgba(255, 59, 59, 0.15);
       --success: #051B23;
       --warn: #051B23;
       --danger: #051B23;
@@ -34,7 +34,7 @@
       --border: #353537;
       --text: #F5F6F6;
       --muted: #9D9E9F;
-      --accent-soft: rgba(232, 255, 63, 0.14);
+      --accent-soft: rgba(255, 59, 59, 0.15);
     }
     :root[data-theme="light"] {
       color-scheme: light;
@@ -44,9 +44,10 @@
       --border: #C4C4C4;
       --text: #051B23;
       --muted: #5D6B70;
-      --accent-soft: rgba(232, 255, 63, 0.35);
+      --accent-soft: rgba(255, 59, 59, 0.12);
     }
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     body {
       margin: 0;
       min-height: 100vh;
@@ -95,29 +96,249 @@
       font-size: 0.9rem;
       font-weight: 500;
       cursor: pointer;
-       padding: 10px 12px;
-       border-radius: 7px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      transition: background 0.15s, color 0.15s;
     }
     .nav button:hover { background: var(--surface-2); color: var(--text); }
-    .nav button.active { background: var(--accent); color: #051B23; font-weight: 600; }
-    .sidebar-links { display: grid; gap: 7px; padding-top: 2px; border-top: 1px solid var(--border); }
-    .sidebar-foot { margin-top: auto; padding: 14px 8px 0; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); }
-    .sidebar-foot .email { color: var(--text); font-weight: 500; margin-bottom: 8px; word-break: break-all; }
+    .nav button.active {
+      background: var(--surface-2);
+      color: var(--text);
+      font-weight: 600;
+      border-left: 3px solid var(--accent);
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+    .sidebar-links { display: grid; gap: 6px; padding-top: 2px; border-top: 1px solid var(--border); }
     .sidebar-docs {
-      display: block;
-       margin: 0;
-       padding: 9px 10px;
-       border-radius: 7px;
-       border: 1px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1px solid transparent;
       background: var(--surface-2);
       color: var(--text);
       text-decoration: none;
-       font-size: 0.8125rem;
+      font-size: 0.8125rem;
       font-weight: 500;
       cursor: pointer;
       text-align: left;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .sidebar-docs:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .sidebar-docs:hover { border-color: var(--border); background: var(--bg); color: var(--text); }
+
+    /* Sidebar foot & User Profile Card */
+    .sidebar-foot {
+      margin-top: auto;
+      padding: 12px 0 0;
+      border-top: 1px solid var(--border);
+      position: relative;
+    }
+    .user-menu-wrap {
+      position: relative;
+      width: 100%;
+    }
+    .user-card-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+      color: var(--text);
+      text-align: left;
+      box-sizing: border-box;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .user-card-btn:hover, .user-card-btn.open {
+      background: var(--surface-2);
+      border-color: var(--border);
+    }
+    .user-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--accent);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.82rem;
+      flex-shrink: 0;
+    }
+    .user-meta {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .user-email {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+    .user-role {
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-weight: 500;
+      display: block;
+    }
+    .user-chevron {
+      color: var(--muted);
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+    .user-card-btn.open .user-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* Popover */
+    .user-popover {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
+      padding: 12px;
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      animation: popoverFadeIn 0.15s cubic-bezier(0.2, 0, 0, 1);
+    }
+    .user-popover.open,
+    .user-popover:not([hidden]) {
+      display: flex;
+    }
+    .user-popover[hidden] {
+      display: none !important;
+    }
+    :root[data-theme="dark"] .user-popover {
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    }
+    @keyframes popoverFadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .popover-user-header {
+      padding: 2px 4px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .popover-email {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .popover-sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .popover-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .popover-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      padding: 0 4px;
+    }
+    .popover-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: left;
+      width: 100%;
+      box-sizing: border-box;
+      transition: background 0.12s, color 0.12s;
+    }
+    .popover-item:hover {
+      background: var(--surface);
+    }
+    .popover-item.danger {
+      color: #EF4444;
+    }
+    .popover-item.danger:hover {
+      background: rgba(239, 68, 68, 0.12);
+      color: #EF4444;
+    }
+    .popover-ext {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .popover-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 2px 0;
+    }
+
+    /* Theme segmented control */
+    .theme-segmented {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3px;
+      background: var(--surface);
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .theme-seg-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 5px 0;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+    .theme-seg-btn:hover {
+      color: var(--text);
+    }
+    .theme-seg-btn.active {
+      background: var(--surface-2);
+      color: var(--text);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
     .main { flex: 1; min-width: 0; width: 0; max-width: 1440px; padding: 34px clamp(20px, 4vw, 64px) 64px; }
     .topbar {
       display: flex;
@@ -139,8 +360,15 @@
     .select, .btn {
       font: inherit;
       font-size: 0.875rem;
-       border-radius: 0;
-      padding: 9px 14px;
+      border-radius: 8px;
+      padding: 8px 14px;
+      min-height: 38px;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
     }
     .select {
       background: var(--surface-2);
@@ -153,17 +381,18 @@
       background: var(--surface-2);
       color: var(--text);
       cursor: pointer;
-      font-weight: 500;
+      font-weight: 550;
     }
     .btn:hover { border-color: var(--muted); }
-    .btn-primary { background: var(--accent); border-color: #051B23; color: #051B23; font-weight: 600; }
-    .btn-primary:hover { filter: brightness(1.06); color: #051B23; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); border: 1px solid var(--accent); color: #FFFFFF; font-weight: 600; }
+    .btn-primary:hover { background: #E03030; border-color: #E03030; color: #FFFFFF; }
     .btn-ghost { background: transparent; }
     .badge {
       font-size: 0.72rem;
       font-weight: 600;
       padding: 5px 10px;
-      border-radius: 0;
+      border-radius: 6px;
       background: var(--accent-soft);
       color: var(--text);
       border: 1px solid var(--text);
@@ -364,14 +593,71 @@
        </nav>
        <div class="sidebar-links" aria-label="Resources">
          <div class="nav-label">Resources</div>
-         <a class="sidebar-docs" href="https://sooauth.com/docs" target="_blank" rel="noopener">Documentation <span aria-hidden="true">↗</span></a>
-         <a class="sidebar-docs" href="https://sooauth.com/docs/integrate-oidc#ai-prompt" target="_blank" rel="noopener">AI setup prompt <span aria-hidden="true">↗</span></a>
-         <a class="sidebar-docs" href="/auth/account">Security Center <span aria-hidden="true">↗</span></a>
-         <button type="button" class="sidebar-docs" id="theme-toggle">Use dark theme</button>
+         <a class="sidebar-docs" href="https://sooauth.com/docs" target="_blank" rel="noopener"><span>Documentation</span> <span aria-hidden="true">↗</span></a>
+         <a class="sidebar-docs" href="https://sooauth.com/docs/integrate-oidc#ai-prompt" target="_blank" rel="noopener"><span>AI setup prompt</span> <span aria-hidden="true">↗</span></a>
        </div>
-      <div class="sidebar-foot">
-        <div class="email" id="dash-user"></div>
-        <button type="button" class="btn btn-ghost" id="sign-out" style="width:100%">Sign out</button>
+      <div class="sidebar-foot" id="sidebar-foot">
+        <div class="user-menu-wrap" id="user-menu-wrap">
+          <button type="button" class="user-card-btn" id="user-menu-btn" aria-haspopup="true" aria-expanded="false" title="Account settings">
+            <span class="user-avatar" id="user-avatar">?</span>
+            <div class="user-meta">
+              <span class="user-email" id="dash-user">Loading account…</span>
+              <span class="user-role">Platform admin</span>
+            </div>
+            <svg class="user-chevron" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+
+          <div class="user-popover" id="user-popover" role="menu" hidden>
+            <div class="popover-user-header">
+              <strong class="popover-email" id="popover-user-email"></strong>
+              <small class="popover-sub">Account &amp; Appearance</small>
+            </div>
+
+            <div class="popover-section">
+              <a class="popover-item" href="/auth/account" id="user-security-link">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <span>Security Center</span>
+                <span class="popover-ext">↗</span>
+              </a>
+            </div>
+
+            <div class="popover-section">
+              <div class="popover-label">Theme</div>
+              <div class="theme-segmented" id="theme-segmented">
+                <button type="button" class="theme-seg-btn" data-theme-val="light" title="Light theme">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                  <span>Light</span>
+                </button>
+                <button type="button" class="theme-seg-btn" data-theme-val="dark" title="Dark theme">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                  <span>Dark</span>
+                </button>
+                <button type="button" class="theme-seg-btn" data-theme-val="system" title="System preference">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                  <span>Auto</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="popover-divider"></div>
+
+            <div class="popover-section">
+              <button type="button" class="popover-item danger" id="sign-out">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Sign out</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
     <main class="main">
@@ -481,18 +767,20 @@
     }
     window.addEventListener("hashchange", () => showTab(tabFromHash(), false));
     document.querySelectorAll("#nav button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
-    document.getElementById("sign-out").onclick = async () => {
-      const btn = document.getElementById("sign-out");
-      btn.disabled = true;
-      try {
-        const res = await fetch("/auth/sign-out", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": csrfToken() } });
-        if (!res.ok) throw new Error("sign_out_failed");
-        location.href = "/auth/sign-in";
-      } catch (e) {
-        btn.disabled = false;
-        showAlert("Sign out failed. Refresh and try again.");
-      }
-    };
+    const signOutBtn = document.getElementById("sign-out");
+    if (signOutBtn) {
+      signOutBtn.onclick = async () => {
+        signOutBtn.disabled = true;
+        try {
+          const res = await fetch("/auth/sign-out", { method: "POST", credentials: "same-origin", headers: { "X-CSRF-Token": csrfToken() } });
+          if (!res.ok) throw new Error("sign_out_failed");
+          location.href = "/auth/sign-in";
+        } catch (e) {
+          signOutBtn.disabled = false;
+          showAlert("Sign out failed. Refresh and try again.");
+        }
+      };
+    }
 
     function copyText(text) {
       navigator.clipboard.writeText(text).then(() => showNotice("Copied to clipboard.")).catch(() => showAlert("Could not copy."));
@@ -533,7 +821,13 @@
     }
 
     async function setupHeader(me) {
-      if (me?.email) document.getElementById("dash-user").textContent = me.email;
+      if (me?.email) {
+        document.getElementById("dash-user").textContent = me.email;
+        const popoverEmail = document.getElementById("popover-user-email");
+        if (popoverEmail) popoverEmail.textContent = me.email;
+        const avatar = document.getElementById("user-avatar");
+        if (avatar) avatar.textContent = me.email.charAt(0).toUpperCase();
+      }
       if (!me?.projects?.length) return;
       const sel = document.getElementById("project-select");
       const add = document.getElementById("add-project");
@@ -653,13 +947,13 @@
           <div class="card">
             <h2>Start here</h2>
             <p class="desc">Connect your first app in five minutes. Keep this checklist open while you integrate.</p>
-            <ul class="plan-features" style="list-style:none;padding-left:0">
-              <li>${appReady ? "✓" : "○"} Copy your issuer, client ID, and discovery URL below.</li>
-              <li>${appReady ? "✓" : "○"} Add an exact callback URL under Redirect URIs.</li>
-              <li>○ Use the <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline;text-underline-offset:3px">OIDC setup prompt</a> or your framework&apos;s OIDC library.</li>
-              <li>○ Test the hosted sign-in flow before shipping.</li>
+            <ul class="checklist" style="list-style:none;padding:0;margin:0 0 18px;display:grid;gap:9px;color:var(--muted);font-size:0.875rem;line-height:1.5;">
+              <li style="display:flex;align-items:baseline;gap:8px;"><span style="color:var(--accent);font-weight:bold;">${appReady ? "✓" : "○"}</span> <span>Copy your issuer, client ID, and discovery URL below.</span></li>
+              <li style="display:flex;align-items:baseline;gap:8px;"><span style="color:var(--accent);font-weight:bold;">${appReady ? "✓" : "○"}</span> <span>Add an exact callback URL under Redirect URIs.</span></li>
+              <li style="display:flex;align-items:baseline;gap:8px;"><span style="color:var(--accent);font-weight:bold;">○</span> <span>Use the <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline;text-underline-offset:3px">OIDC setup prompt</a> or your framework&apos;s OIDC library.</span></li>
+              <li style="display:flex;align-items:baseline;gap:8px;"><span style="color:var(--accent);font-weight:bold;">○</span> <span>Test the hosted sign-in flow before shipping.</span></li>
             </ul>
-            <a href="/auth/sign-in?return_to=/dashboard/" class="btn btn-primary" style="margin-top:16px">Test sign-in</a>
+            <a href="/auth/sign-in?return_to=/dashboard/" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:6px;width:fit-content;text-decoration:none;">Test sign-in →</a>
           </div>
           <div class="card">
             <h2>Connect your app</h2>
@@ -739,19 +1033,20 @@
             : (p.platform_ready
               ? "Using sooauth platform OAuth (Google shows sooauth.com on Free)."
               : "Platform OAuth unavailable — add custom credentials to enable.");
+          const preferCustom = p.has_custom || !p.platform_ready;
           const customPanel = p.can_use_custom ? `
             <div class="provider-custom-panel">
               <div class="provider-custom">
                 <div class="mode-row">
-                  <label class="mode"><input type="radio" name="mode-${p.provider}" value="platform" ${!p.has_custom ? "checked" : ""} data-mode /> Use sooauth platform</label>
-                  <label class="mode"><input type="radio" name="mode-${p.provider}" value="custom" ${p.has_custom ? "checked" : ""} data-mode /> Custom OAuth app</label>
+                  <label class="mode" style="${!p.platform_ready ? "opacity:0.5;cursor:not-allowed;" : ""}"><input type="radio" name="mode-${p.provider}" value="platform" ${!preferCustom ? "checked" : ""} ${p.platform_ready ? "" : "disabled"} data-mode /> Use sooauth platform${p.platform_ready ? "" : " (Unavailable)"}</label>
+                  <label class="mode"><input type="radio" name="mode-${p.provider}" value="custom" ${preferCustom ? "checked" : ""} data-mode /> Custom OAuth app</label>
                 </div>
                 <p class="callback-label">Redirect URI (add this in ${label} Cloud Console)</p>
                 <div class="copy-row" style="margin-bottom:12px">
                   <div class="value">${escapeHtml(p.callback_url || "")}</div>
                   <button type="button" class="btn" data-copy="${escapeHtml(p.callback_url || "")}">Copy</button>
                 </div>
-                <div class="custom-fields" data-custom-fields style="${p.has_custom ? "" : "display:none"}">
+                <div class="custom-fields" data-custom-fields style="${preferCustom ? "" : "display:none"}">
                   <div class="field"><label>Client ID</label><input type="text" data-client-id autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="verbatim" name="sooauth-oauth-client-id-${escapeHtml(p.provider)}" value="${escapeHtml(p.client_id || "")}" placeholder="Paste full Client ID from ${label}"></div>
                   <div class="field">
                     <label>Client secret${p.has_client_secret ? ' <span class="secret-saved">Saved</span>' : ""}</label>
@@ -998,7 +1293,7 @@
           <form id="theme-form" style="max-width:420px">
             <div class="field"><label>Brand name</label><input name="brand_name" value="${escapeHtml(data.brand_name || "sooauth")}" ${!data.can_customize_brand ? "disabled" : ""}></div>
             <div class="field"><label>Logo URL</label><input name="logo_url" value="${escapeHtml(data.logo_url || "")}" ${!data.can_customize_brand ? "disabled" : ""}></div>
-            <div class="field"><label>Accent color</label><input name="accent_color" value="${escapeHtml(data.accent_color || "#E8FF3F")}"></div>
+            <div class="field"><label>Accent color</label><input name="accent_color" value="${escapeHtml(data.accent_color || "#FF3B3B")}"></div>
             <label style="display:flex;align-items:center;gap:10px;margin:16px 0;font-size:.875rem;color:var(--muted)">
               <input name="hide_branding" type="checkbox" ${data.hide_branding ? "checked" : ""} ${!data.can_hide_branding ? "disabled" : ""} style="width:auto">
               Hide &quot;Powered by sooauth&quot;
@@ -1092,27 +1387,95 @@
       } catch (err) { el.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`; }
     }
 
+    function setupUserMenu() {
+      const btn = document.getElementById("user-menu-btn");
+      const popover = document.getElementById("user-popover");
+      const wrap = document.getElementById("user-menu-wrap");
+      if (!btn || !popover || !wrap) return;
+
+      function closeMenu() {
+        popover.hidden = true;
+        popover.classList.remove("open");
+        btn.classList.remove("open");
+        btn.setAttribute("aria-expanded", "false");
+      }
+
+      function openMenu() {
+        popover.hidden = false;
+        popover.classList.add("open");
+        btn.classList.add("open");
+        btn.setAttribute("aria-expanded", "true");
+      }
+
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const isOpen = !popover.hidden && popover.classList.contains("open");
+        if (isOpen) {
+          closeMenu();
+        } else {
+          openMenu();
+        }
+      };
+
+      popover.onclick = (e) => {
+        e.stopPropagation();
+      };
+
+      document.addEventListener("click", (e) => {
+        if (!wrap.contains(e.target)) {
+          closeMenu();
+        }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeMenu();
+          btn.focus();
+        }
+      });
+    }
+
     function setupTheme() {
       const root = document.documentElement;
-      const button = document.getElementById("theme-toggle");
-      const stored = localStorage.getItem("sooauth-dashboard-theme");
-      if (stored === "light" || stored === "dark") root.dataset.theme = stored;
-      const update = () => {
-        const dark = root.dataset.theme === "dark";
-        button.textContent = dark ? "Use light theme" : "Use dark theme";
-      };
-      update();
-      button.onclick = () => {
-        const next = root.dataset.theme === "dark" ? "light" : "dark";
-        root.dataset.theme = next;
-        localStorage.setItem("sooauth-dashboard-theme", next);
-        update();
-      };
+      const segButtons = document.querySelectorAll(".theme-seg-btn");
+      const stored = localStorage.getItem("sooauth-dashboard-theme") || "system";
+
+      function applyTheme(t) {
+        if (t === "system") {
+          const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          root.dataset.theme = dark ? "dark" : "light";
+        } else {
+          root.dataset.theme = t;
+        }
+        localStorage.setItem("sooauth-dashboard-theme", t);
+        segButtons.forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.themeVal === t);
+        });
+      }
+
+      applyTheme(stored);
+
+      segButtons.forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          applyTheme(btn.dataset.themeVal);
+        };
+      });
+
+      if (window.matchMedia) {
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+          if (localStorage.getItem("sooauth-dashboard-theme") === "system") {
+            applyTheme("system");
+          }
+        });
+      }
     }
 
     async function boot() {
       try {
         setupTheme();
+        setupUserMenu();
         await refreshDashboard();
         showTab(tabFromHash(), false);
       } catch (err) { showAlert(err.message); }

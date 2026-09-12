@@ -79,7 +79,7 @@ type verificationLayout struct {
 }
 
 func layoutVerificationEmail(l verificationLayout) string {
-	accent := "#E8FF3F"
+	accent := "#FF3B3B"
 	hasLink := strings.TrimSpace(l.LinkURL) != ""
 	hasCode := strings.TrimSpace(l.Code) != ""
 	btnText := strings.TrimSpace(l.ButtonText)
@@ -95,20 +95,20 @@ func layoutVerificationEmail(l verificationLayout) string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%s</title>
 </head>
-<body style="margin:0;padding:0;background:#E3EFD7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#051B23;">
+<body style="margin:0;padding:0;background:#FFF4E6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1C1412;">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;">%s</div>
-  <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#E3EFD7;padding:32px 16px;">
+  <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#FFF4E6;padding:32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#FFFFFF;border-radius:16px;border:1px solid #051B23;overflow:hidden;">
+        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#FFFFFF;border-radius:16px;border:1px solid #E4DFD9;overflow:hidden;">
           <tr>
-            <td style="padding:28px 32px 8px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#051B23;">%s</td>
+            <td style="padding:28px 32px 8px;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#1C1412;">%s</td>
           </tr>
           <tr>
-            <td style="padding:8px 32px 0;font-size:20px;font-weight:600;line-height:1.35;color:#051B23;">%s</td>
+            <td style="padding:8px 32px 0;font-size:20px;font-weight:600;line-height:1.35;color:#1C1412;">%s</td>
           </tr>
           <tr>
-            <td style="padding:16px 32px 0;font-size:15px;line-height:1.6;color:#5D6B70;">%s</td>
+            <td style="padding:16px 32px 0;font-size:15px;line-height:1.6;color:#6B6360;">%s</td>
           </tr>`,
 		html.EscapeString(l.Title),
 		html.EscapeString(l.Lead),
@@ -121,7 +121,7 @@ func layoutVerificationEmail(l verificationLayout) string {
 		body.WriteString(fmt.Sprintf(`
           <tr>
             <td style="padding:24px 32px 8px;" align="center">
-              <div style="display:inline-block;padding:16px 24px;border-radius:12px;background:#F5F5F5;font-size:32px;font-weight:700;letter-spacing:0.35em;color:#051B23;">%s</div>
+              <div style="display:inline-block;padding:16px 24px;border-radius:12px;background:#FFF4E6;font-size:32px;font-weight:700;letter-spacing:0.35em;color:#1C1412;border:1px solid #F7E4CD;">%s</div>
             </td>
           </tr>`, html.EscapeString(l.Code)))
 	}
@@ -130,7 +130,7 @@ func layoutVerificationEmail(l verificationLayout) string {
 		body.WriteString(fmt.Sprintf(`
           <tr>
             <td style="padding:28px 32px 8px;" align="center">
-              <a href="%s" style="display:inline-block;background:%s;color:#051B23;text-decoration:none;font-size:15px;font-weight:600;padding:14px 28px;border-radius:10px;">%s</a>
+              <a href="%s" style="display:inline-block;background:%s;color:#FFFFFF;text-decoration:none;font-size:15px;font-weight:600;padding:14px 28px;border-radius:10px;">%s</a>
             </td>
           </tr>
           <tr>

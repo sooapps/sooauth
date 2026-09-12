@@ -14,7 +14,7 @@ func TestRenderAllPages(t *testing.T) {
 	data := ViewData{
 		Title:       "Test",
 		BrandName:   "sooauth",
-		AccentColor: "#E8FF3F",
+		AccentColor: "#FF3B3B",
 		AppURL:      "https://auth.sooauth.com",
 	}
 	pages := []string{

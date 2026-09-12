@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./styles.css";
 
 type Tab = "overview" | "integration" | "providers" | "project" | "users" | "sessions" | "theme" | "email" | "billing" | "audit" | "webhooks";
@@ -64,7 +64,7 @@ function Integration({ notify }: { notify: (message: string) => void }) {
   return <>
     <Card title="Start here" description="Connect your first app in five minutes. Keep this checklist open while you integrate.">
       <div className="checklist"><span>✓ Copy your issuer, client ID, and discovery URL below.</span><span>{uris.length ? "✓" : "○"} Add an exact callback URL under Redirect URIs.</span><span>○ Use the <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt">OIDC setup prompt</a> or your framework&apos;s OIDC library.</span><span>○ Test the hosted sign-in flow before shipping.</span></div>
-      <a className="button primary inline" href="/auth/sign-in?return_to=/dashboard/">Test sign-in</a>
+      <a className="button primary inline" href="/auth/sign-in?return_to=/dashboard/">Test sign-in →</a>
     </Card>
     <Card title="Connect your app" description="Copy issuer and client ID into your app's OIDC config. Social keys stay in Sooauth only.">
       <div className="data-grid">{[["Issuer", data.issuer], ["Client ID", data.client_id], ["Discovery URL", data.discovery_url]].map(([label, value]) => <div className="copy-field" key={label as string}><span>{label}</span><div><code>{value}</code><Button onClick={() => copy(value as string)}>Copy</Button></div></div>)}</div>
@@ -79,16 +79,315 @@ function Integration({ notify }: { notify: (message: string) => void }) {
   </>;
 }
 
+function ProviderCard({
+  provider,
+  isOpen,
+  onToggleOpen,
+  onUpdate,
+  notify,
+}: {
+  provider: Data;
+  isOpen: boolean;
+  onToggleOpen: () => void;
+  onUpdate: (provider: string, body: Data) => Promise<void>;
+  notify: (message: string) => void;
+}) {
+  const [selectedMode, setSelectedMode] = useState<"platform" | "custom">(
+    provider.has_custom || !provider.platform_ready ? "custom" : "platform"
+  );
+  const [clientId, setClientId] = useState(provider.client_id || "");
+  const [clientSecret, setClientSecret] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    if (provider.has_custom) {
+      setSelectedMode("custom");
+    } else if (provider.platform_ready) {
+      setSelectedMode("platform");
+    } else {
+      setSelectedMode("custom");
+    }
+    setClientId(provider.client_id || "");
+  }, [provider.has_custom, provider.platform_ready, provider.client_id]);
+
+  const label = provider.provider ? provider.provider[0].toUpperCase() + provider.provider.slice(1) : "";
+  const canToggle = Boolean(provider.has_custom || provider.platform_ready);
+
+  const handleToggle = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const nextEnabled = e.target.checked;
+    if (nextEnabled && !canToggle) {
+      notify(`Please save custom OAuth credentials first to enable ${label}.`);
+      if (!isOpen) onToggleOpen();
+      return;
+    }
+    try {
+      setToggling(true);
+      await onUpdate(provider.provider, { enabled: nextEnabled });
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const handleSaveCustom = async () => {
+    if (!clientId.trim()) {
+      notify(`Client ID is required for ${label}.`);
+      return;
+    }
+    if (!clientSecret && !provider.has_client_secret) {
+      notify(`Client secret is required for ${label}.`);
+      return;
+    }
+    try {
+      setSaving(true);
+      await onUpdate(provider.provider, {
+        enabled: true,
+        custom: true,
+        client_id: clientId.trim(),
+        client_secret: clientSecret,
+      });
+      setClientSecret("");
+      notify(`${label} custom OAuth credentials saved and enabled.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevertPlatform = async () => {
+    try {
+      setSaving(true);
+      await onUpdate(provider.provider, {
+        enabled: provider.enabled,
+        use_platform: true,
+      });
+      setSelectedMode("platform");
+      notify(`Switched ${label} back to sooauth platform OAuth.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copy = (val: string) => {
+    navigator.clipboard.writeText(val).then(() => notify("Copied to clipboard."));
+  };
+
+  const modeDesc = provider.has_custom
+    ? `Custom OAuth app${provider.client_id_hint ? ` · ${provider.client_id_hint}` : ""}`
+    : provider.platform_ready
+    ? "Using sooauth platform OAuth (Google shows sooauth.com on Free)"
+    : "Platform OAuth unavailable — add custom credentials to enable";
+
+  return (
+    <article className={`provider ${isOpen ? "open" : ""}`}>
+      <div
+        className="provider-head"
+        onClick={onToggleOpen}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggleOpen();
+          }
+        }}
+      >
+        <div className="provider-info">
+          <h2>
+            {label}
+            <span className={`status ${provider.enabled ? "on" : "off"}`}>
+              {provider.enabled ? "Live" : "Off"}
+            </span>
+          </h2>
+          <p>{modeDesc}</p>
+        </div>
+        <div className="provider-controls" onClick={(e) => e.stopPropagation()}>
+          <label
+            className={`switch ${!canToggle && !provider.enabled ? "disabled" : ""}`}
+            title={
+              canToggle
+                ? provider.enabled
+                  ? "Turn off provider"
+                  : "Turn on provider"
+                : "Add custom credentials to enable"
+            }
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(provider.enabled)}
+              disabled={toggling}
+              onChange={handleToggle}
+              aria-label={`Toggle ${label} login`}
+            />
+            <span className="slider"></span>
+          </label>
+          <button
+            type="button"
+            className="chevron-btn"
+            onClick={onToggleOpen}
+            aria-label={isOpen ? `Collapse ${label}` : `Expand ${label}`}
+          >
+            <span className="chevron">{isOpen ? "−" : "+"}</span>
+          </button>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="provider-body">
+          <div className="mode-row">
+            <label
+              className={`mode-label ${selectedMode === "platform" ? "active" : ""} ${
+                !provider.platform_ready ? "disabled" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name={`provider-mode-${provider.provider}`}
+                value="platform"
+                checked={selectedMode === "platform"}
+                disabled={!provider.platform_ready}
+                onChange={() => setSelectedMode("platform")}
+              />
+              <span>Use sooauth platform</span>
+              {!provider.platform_ready && <span className="mode-pill">Unavailable</span>}
+            </label>
+            <label className={`mode-label ${selectedMode === "custom" ? "active" : ""}`}>
+              <input
+                type="radio"
+                name={`provider-mode-${provider.provider}`}
+                value="custom"
+                checked={selectedMode === "custom"}
+                onChange={() => setSelectedMode("custom")}
+              />
+              <span>Custom OAuth app</span>
+            </label>
+          </div>
+
+          {selectedMode === "platform" ? (
+            <div className="platform-info-box">
+              <p>
+                This provider uses Sooauth&apos;s managed platform OAuth credentials.
+                {provider.provider === "google" &&
+                  " On the Free plan, the Google consent screen displays sooauth.com."}
+              </p>
+              {provider.has_custom && (
+                <div style={{ marginTop: 14 }}>
+                  <Button disabled={saving} onClick={handleRevertPlatform}>
+                    Switch back to platform OAuth
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="custom-fields-panel">
+              {provider.callback_url && (
+                <div className="callback-box">
+                  <span className="callback-label">
+                    Authorized Redirect URI (add to {label} Developer Console)
+                  </span>
+                  <div className="copy-field">
+                    <code>{provider.callback_url}</code>
+                    <Button onClick={() => copy(provider.callback_url)}>Copy</Button>
+                  </div>
+                </div>
+              )}
+
+              <Field
+                label="Client ID"
+                value={clientId}
+                onChange={setClientId}
+                placeholder={`Paste full Client ID from ${label}`}
+              />
+
+              <div className="field-group">
+                <Field
+                  label={provider.has_client_secret ? "Client secret (Saved ✓)" : "Client secret"}
+                  type="password"
+                  value={clientSecret}
+                  onChange={setClientSecret}
+                  placeholder={
+                    provider.has_client_secret
+                      ? "•••••••••••• (Leave blank to keep stored secret)"
+                      : "Required"
+                  }
+                />
+                {provider.has_client_secret && (
+                  <p className="field-note">
+                    A client secret is already securely stored. Leave this field blank unless you want to update it.
+                  </p>
+                )}
+              </div>
+
+              <div className="actions" style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center" }}>
+                <Button primary disabled={saving} onClick={handleSaveCustom}>
+                  {saving ? "Saving…" : "Save custom credentials"}
+                </Button>
+                {provider.has_custom && provider.platform_ready && (
+                  <Button disabled={saving} onClick={handleRevertPlatform}>
+                    Use platform instead
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
 function Providers({ notify }: { notify: (message: string) => void }) {
   const [providers, setProviders] = useState<Data[]>([]);
   const [open, setOpen] = useState<string | null>(null);
-  const load = () => request("/providers").then((data) => setProviders(data.providers || [])).catch((e) => notify(e.message));
-  useEffect(() => { load(); }, []);
-  const update = async (provider: string, body: Data) => { try { await request(`/providers/${provider}`, { method: "PUT", body: JSON.stringify(body) }); notify("Provider settings saved."); load(); } catch (e) { notify((e as Error).message); } };
-  return <><div className="notice">Enable the providers you want to show on your login page. Expand a provider to configure custom OAuth credentials.</div><div className="provider-list">{providers.map((provider) => <article className={`provider ${open === provider.provider ? "open" : ""}`} key={provider.provider}>
-    <button className="provider-head" onClick={() => setOpen(open === provider.provider ? null : provider.provider)}><div><h2>{provider.provider[0].toUpperCase() + provider.provider.slice(1)} <span className={`status ${provider.enabled ? "on" : "off"}`}>{provider.enabled ? "Live" : "Off"}</span></h2><p>{provider.has_custom ? "Custom OAuth app" : provider.platform_ready ? "Using sooauth platform OAuth" : "Add custom credentials to enable"}</p></div><span className="chevron">{open === provider.provider ? "−" : "+"}</span></button>
-    {open === provider.provider && <div className="provider-body"><div className="mode-row"><label><input type="radio" checked={!provider.has_custom} onChange={() => update(provider.provider, { enabled: provider.enabled, use_platform: true })} /> Use platform</label><label><input type="radio" checked={provider.has_custom} readOnly /> Custom OAuth app</label></div><Field label="Client ID" value={provider.client_id || ""} onChange={(value) => setProviders(providers.map((item) => item.provider === provider.provider ? { ...item, client_id: value } : item))} /><Field label="Client secret" type="password" value={provider.secret || ""} onChange={(value) => setProviders(providers.map((item) => item.provider === provider.provider ? { ...item, secret: value } : item))} /><Button primary onClick={() => update(provider.provider, { enabled: provider.enabled, custom: true, client_id: provider.client_id || "", client_secret: provider.secret || "" })}>Save custom credentials</Button></div>}
-  </article>)}</div></>;
+
+  const load = () =>
+    request("/providers")
+      .then((data) => {
+        const list = data.providers || [];
+        setProviders(list);
+        // Default open the first provider if none is open
+        if (!open && list.length > 0) {
+          setOpen(list[0].provider);
+        }
+      })
+      .catch((e) => notify(e.message));
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const update = async (provider: string, body: Data) => {
+    try {
+      await request(`/providers/${provider}`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      load();
+    } catch (e) {
+      notify((e as Error).message);
+      throw e;
+    }
+  };
+
+  return (
+    <>
+      <div className="notice">
+        Enable the providers you want to show on your login page. Expand a provider to configure custom OAuth credentials or toggle login on/off.
+      </div>
+      <div className="provider-list">
+        {providers.map((provider) => (
+          <ProviderCard
+            key={provider.provider}
+            provider={provider}
+            isOpen={open === provider.provider}
+            onToggleOpen={() => setOpen(open === provider.provider ? null : provider.provider)}
+            onUpdate={update}
+            notify={notify}
+          />
+        ))}
+      </div>
+    </>
+  );
 }
 
 function Overview() { const [data, setData] = useState<Data | null>(null); useEffect(() => { Promise.all([request("/users"), request("/sessions"), request("/audit")]).then(([users, sessions, audit]) => setData({ users, sessions, audit })).catch(() => setData({ users: {}, sessions: {}, audit: {} })); }, []); if (!data) return <Loading />; return <><div className="metrics"><Metric value={(data.users.users || []).length} label="App users" /><Metric value={(data.sessions.sessions || []).length} label="Active sessions" /><Metric value={(data.audit.entries || []).length} label="Audit events" /></div><Card title="Recent activity" description="A quick health check for this project.">{data.audit.entries?.length ? <Table headers={["Time", "Action", "IP"]} rows={data.audit.entries.slice(0, 8).map((item: Data) => [item.created_at, item.action, item.ip || "—"])} /> : <Empty text="No events yet." />}</Card></>; }
@@ -96,7 +395,116 @@ function Metric({ value, label }: { value: number; label: string }) { return <di
 function Table({ headers, rows }: { headers: string[]; rows: any[][] }) { return <div className="table-wrap"><table><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{String(cell)}</td>)}</tr>)}</tbody></table></div>; }
 function Empty({ text }: { text: string }) { return <div className="empty">{text}</div>; }
 function Loading() { return <div className="loading">Loading workspace…</div>; }
-function ThemeControl({ theme, onChange }: { theme: AppTheme; onChange: (theme: AppTheme) => void }) { return <label className="theme-control"><span>Appearance</span><select value={theme} onChange={(event) => onChange(event.target.value as AppTheme)} aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>; }
+function UserProfileMenu({ me, theme, onThemeChange }: { me: Data | null; theme: AppTheme; onThemeChange: (theme: AppTheme) => void }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    if (open) {
+      document.addEventListener("mousedown", handleOutsideClick);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  const handleSignOut = () => {
+    fetch(`${API}/auth/sign-out`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "X-CSRF-Token": decodeURIComponent(csrf()) }
+    }).then(() => {
+      location.href = "/auth/sign-in";
+    });
+  };
+
+  return (
+    <div className="user-profile-menu-wrap" ref={menuRef}>
+      <button
+        type="button"
+        className={`profile-card-trigger ${open ? "open" : ""}`}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label="User account and theme settings"
+      >
+        <div className="profile-identity">
+          <span className="avatar">{(me?.email || "?").slice(0, 1).toUpperCase()}</span>
+          <div className="profile-info">
+            <strong title={me?.email}>{me?.email || "Loading account…"}</strong>
+            <span className="profile-badge">Platform admin</span>
+          </div>
+        </div>
+        <svg className="profile-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="profile-popover" role="menu">
+          <div className="popover-header">
+            <strong>{me?.email}</strong>
+            <small>Account settings</small>
+          </div>
+
+          <div className="popover-divider" />
+
+          <div className="popover-section">
+            <span className="popover-label">Appearance</span>
+            <div className="theme-toggle-group">
+              {(["light", "dark", "system"] as AppTheme[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`theme-pill ${theme === t ? "active" : ""}`}
+                  onClick={() => { onThemeChange(t); setOpen(false); }}
+                >
+                  {t === "light" && "☀️ Light"}
+                  {t === "dark" && "🌙 Dark"}
+                  {t === "system" && "💻 System"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="popover-divider" />
+
+          <div className="popover-links">
+            <a href="/auth/account" className="popover-item">
+              <span>Security Center</span>
+              <span>↗</span>
+            </a>
+            <a href="https://sooauth.com/docs" target="_blank" rel="noopener noreferrer" className="popover-item">
+              <span>Documentation</span>
+              <span>↗</span>
+            </a>
+          </div>
+
+          <div className="popover-divider" />
+
+          <button type="button" className="popover-item danger" onClick={handleSignOut}>
+            <span>Sign out</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function WebhookRow({ webhook, notify }: { webhook: Data; notify: (message: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -145,7 +553,62 @@ export function App() {
   const page = tab === "integration" ? <Integration notify={notify} /> : tab === "providers" ? <Providers notify={notify} /> : tab === "overview" ? <Overview /> : tab === "email" ? <EmailSettings notify={notify} /> : ["users", "sessions", "audit", "webhooks"].includes(tab) ? <ResourcePage tab={tab} notify={notify} /> : ["project", "theme", "billing"].includes(tab) ? <Settings tab={tab as "project" | "theme" | "billing"} notify={notify} /> : null;
   const switchProject = async (id: string) => { try { await request(`/projects/${id}/select`, { method: "POST" }); location.reload(); } catch (e) { notify((e as Error).message); } };
   const createProject = async () => { const name = window.prompt("Project name"); if (!name?.trim()) return; try { await request("/projects", { method: "POST", body: JSON.stringify({ name: name.trim() }) }); location.reload(); } catch (e) { notify((e as Error).message); } };
-  return <div className="app"><aside className="sidebar"><a className="brand" href="https://sooauth.com"><img className="brand-logo brand-logo-light" src="/sooauth-light.png" alt="sooauth" /><img className="brand-logo brand-logo-dark" src="/sooauth-dark.png" alt="" /><span>sooauth</span></a>{me?.projects?.length ? <div className="sidebar-project"><label className="project-picker"><span>Current project</span><div className="project-select-wrap"><select className="project-select" value={me.project?.id || ""} onChange={(e) => switchProject(e.target.value)} aria-label="Current project">{me.projects.map((project: Data) => <option value={project.id} key={project.id}>{project.name}</option>)}</select></div></label><Button primary onClick={createProject}>+ New project</Button></div> : null}<nav>{["Workspace", "Configuration"].map((group) => <div className="nav-group" key={group}><small>{group}</small>{tabs.filter((item) => item.group === group).map((item) => <button className={tab === item.id ? "active" : ""} key={item.id} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>)}</nav><div className="sidebar-links"><a href="https://sooauth.com/docs">Documentation ↗</a><a href="https://sooauth.com/docs/integrate-oidc#ai-prompt">AI setup prompt ↗</a><a href="/auth/account">Security Center ↗</a></div><div className="profile"><div className="profile-identity"><span className="avatar">{(me?.email || "?").slice(0, 1).toUpperCase()}</span><strong>{me?.email || "Loading account…"}</strong></div><button onClick={() => { fetch(`${API}/auth/sign-out`, { method: "POST", credentials: "include", headers: { "X-CSRF-Token": decodeURIComponent(csrf()) } }).then(() => { location.href = "/auth/sign-in"; }); }}>Sign out</button></div></aside><main><header className="topbar"><div><p className="eyebrow">Workspace</p><h1>{title}{me?.project?.name ? <span> · {me.project.name}</span> : null}</h1></div><ThemeControl theme={theme} onChange={changeTheme} /></header>{notice && <div className="toast">{notice}</div>}<div className="content">{page}</div></main></div>;
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <a className="brand" href="https://sooauth.com">
+          <img className="brand-logo brand-logo-light" src="/sooauth-light.png" alt="sooauth" />
+          <img className="brand-logo brand-logo-dark" src="/sooauth-dark.png" alt="" />
+          <span>sooauth</span>
+        </a>
+        {me?.projects?.length ? (
+          <div className="sidebar-project">
+            <label className="project-picker">
+              <span>Current project</span>
+              <div className="project-select-wrap">
+                <select className="project-select" value={me.project?.id || ""} onChange={(e) => switchProject(e.target.value)} aria-label="Current project">
+                  {me.projects.map((project: Data) => (
+                    <option value={project.id} key={project.id}>{project.name}</option>
+                  ))}
+                </select>
+              </div>
+            </label>
+            <button type="button" className="btn-new-project" onClick={createProject}>
+              + New project
+            </button>
+          </div>
+        ) : null}
+        <nav>
+          {["Workspace", "Configuration"].map((group) => (
+            <div className="nav-group" key={group}>
+              <small>{group}</small>
+              {tabs.filter((item) => item.group === group).map((item) => (
+                <button className={tab === item.id ? "active" : ""} key={item.id} onClick={() => setTab(item.id)}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="sidebar-links">
+          <a href="https://sooauth.com/docs" target="_blank" rel="noopener noreferrer">Documentation ↗</a>
+          <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt" target="_blank" rel="noopener noreferrer">AI setup prompt ↗</a>
+          <a href="/auth/account">Security Center ↗</a>
+        </div>
+        <UserProfileMenu me={me} theme={theme} onThemeChange={changeTheme} />
+      </aside>
+      <main>
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Workspace</p>
+            <h1>{title}{me?.project?.name ? <span> · {me.project.name}</span> : null}</h1>
+          </div>
+        </header>
+        {notice && <div className="toast">{notice}</div>}
+        <div className="content">{page}</div>
+      </main>
+    </div>
+  );
 }
 
 function EmailSettings({ notify }: { notify: (message: string) => void }) {

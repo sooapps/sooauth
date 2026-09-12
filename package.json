@@ -12,6 +12,8 @@
     "dev": "docker compose up -d && cd server && go run ./cmd/sooauth",
     "dev:infra": "docker compose up -d",
     "dev:server": "cd server && go run ./cmd/sooauth",
+    "dev:admin": "pnpm --filter @sooauth/admin dev",
+    "dev:web": "pnpm --filter @sooauth/web dev",
     "build:admin": "pnpm --filter @sooauth/admin build",
     "build:web": "pnpm --filter @sooauth/web build",
     "cf:build": "pnpm --filter @sooauth/web cf:build",

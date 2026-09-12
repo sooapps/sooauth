@@ -93,7 +93,8 @@
   var lastEmail = "";
 
   function render(cfg, base) {
-    var accent = cfg.accent_color || "#E8FF3F";
+    var accent = cfg.accent_color || "#FF3B3B";
+    var accentFg = (accent.toLowerCase() === "#ff3b3b") ? "#FFFFFF" : "#051B23";
     var policy = policyFromCfg(cfg);
     var html = '<div class="sooauth-widget" style="font-family:system-ui,sans-serif;max-width:400px">';
 
@@ -102,7 +103,7 @@
         '<p style="margin:0 0 14px;font-size:13px;color:#5D6B70">Enter your email and we\'ll send you instructions.</p>' +
         '<form id="sooauth-forgot-form" style="display:grid;gap:10px">' +
         '<input name="email" type="email" required placeholder="Email" value="' + (lastEmail ? lastEmail.replace(/"/g, '&quot;') : "") + '" style="padding:10px;border:1px solid #C4C4C4;border-radius:8px;color:#051B23" />' +
-        '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid #051B23;border-radius:8px;background:' + accent + ';color:#051B23;font-weight:600;cursor:pointer">Send instructions</button>' +
+        '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid ' + accent + ';border-radius:8px;background:' + accent + ';color:' + accentFg + ';font-weight:600;cursor:pointer">Send instructions</button>' +
         '</form>' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:13px">' +
         '<button id="sooauth-back-btn" type="button" style="background:none;border:none;padding:0;color:#051B23;cursor:pointer;text-decoration:underline">Back to sign in</button>' +
@@ -119,7 +120,7 @@
         '<input id="sooauth-password" name="password" type="password" required placeholder="New password" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #C4C4C4;border-radius:8px;color:#051B23" />' +
         '<ul id="sooauth-password-rules" style="list-style:none;padding:8px 0 0;margin:0;display:grid;gap:6px"></ul>' +
         '</div>' +
-        '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid #051B23;border-radius:8px;background:' + accent + ';color:#051B23;font-weight:600;cursor:pointer">Update password</button>' +
+        '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid ' + accent + ';border-radius:8px;background:' + accent + ';color:' + accentFg + ';font-weight:600;cursor:pointer">Update password</button>' +
         '</form>' +
         '<div style="margin-top:14px;text-align:center;font-size:13px">' +
         '<button id="sooauth-back-btn" type="button" style="background:none;border:none;padding:0;color:#051B23;cursor:pointer;text-decoration:underline">Back to sign in</button>' +
@@ -152,7 +153,7 @@
           (showRememberMe
             ? '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#051B23;cursor:pointer;user-select:none"><input type="checkbox" name="remember_me" value="true"' + (rememberMeChecked ? " checked" : "") + ' style="width:16px;height:16px;margin:0;cursor:pointer" /><span>Remember me</span></label>'
             : "") +
-           '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid #051B23;border-radius:8px;background:' + accent + ';color:#051B23;font-weight:600;cursor:pointer">' +
+           '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid ' + accent + ';border-radius:8px;background:' + accent + ';color:' + accentFg + ';font-weight:600;cursor:pointer">' +
           (currentMode === "signup" ? "Create account" : "Sign in") + "</button></form>" +
            '<p id="sooauth-msg" style="font-size:13px;color:#051B23;margin:8px 0 0"></p>';
       }

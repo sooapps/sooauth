@@ -267,7 +267,7 @@ func (t *ThemeStore) Get(ctx context.Context) (Theme, error) {
 	`)
 	var theme Theme
 	if err := row.Scan(&theme.BrandName, &theme.LogoURL, &theme.AccentColor); err != nil {
-		return Theme{BrandName: "sooauth", AccentColor: "#E8FF3F"}, err
+		return Theme{BrandName: "sooauth", AccentColor: "#FF3B3B"}, err
 	}
 	return theme, nil
 }
@@ -288,7 +288,7 @@ func (t *ThemeStore) GetByTenant(ctx context.Context, tenantID uuid.UUID) (Theme
 	`, tenantID)
 	var theme Theme
 	if err := row.Scan(&theme.BrandName, &theme.LogoURL, &theme.AccentColor, &theme.HideBranding); err != nil {
-		return Theme{BrandName: "sooauth", AccentColor: "#E8FF3F"}, err
+		return Theme{BrandName: "sooauth", AccentColor: "#FF3B3B"}, err
 	}
 	return theme, nil
 }

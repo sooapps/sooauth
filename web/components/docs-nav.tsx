@@ -10,6 +10,7 @@ const links = [
   { href: "/docs/integrate-oidc", label: "Connect your app (OIDC)" },
   { href: "/docs/custom-auth-ui", label: "Custom auth UI" },
   { href: "/docs/embed-widget", label: "Embed widget" },
+  { href: "/playground", label: "Widget playground ↗" },
   { href: "/docs/google-oauth", label: "Google login" },
   { href: "/docs/admin", label: "Dashboard" },
   { href: "/docs/self-host", label: "Self-host Sooauth" },

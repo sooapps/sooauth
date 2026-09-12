@@ -1,12 +1,72 @@
 {{define "verify-email-content"}}
-<section class="card">
-  <h1>{{if .Error}}Verification link{{else}}Email verified{{end}}</h1>
-  {{if .Message}}<p class="message">{{.Message}}</p>{{end}}
-  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-  {{if .SignInURL}}
-  <a class="btn" href="{{.SignInURL}}">Back to {{if .BrandName}}{{.BrandName}}{{else}}your app{{end}}</a>
-  {{else}}
-  <a class="btn" href="/auth/sign-in">Sign in</a>
-  {{end}}
-</section>
+<div class="auth-split-container mode-signin" id="auth-split-container">
+  <!-- Brand / Explainer Panel -->
+  <aside class="auth-panel-info">
+    <div class="info-inner">
+      <a class="brand-badge" href="https://sooauth.com">
+        {{if .LogoURL}}
+          <img class="brand-logo-img" src="{{.LogoURL}}" alt="{{.BrandName}}" />
+        {{else}}
+          <img class="brand-logo-img brand-logo-light" src="/auth/static/sooauth-light.png" alt="sooauth" />
+          <img class="brand-logo-img brand-logo-dark" src="/auth/static/sooauth-dark.png" alt="sooauth" />
+        {{end}}
+        <span class="brand-title">{{.BrandName}}</span>
+      </a>
+
+      <div class="info-copy">
+        <h2 class="info-heading">Identity confirmed. Account activated.</h2>
+        <p class="info-desc">Email verification secures your workspace, validates ownership of your account, and enables cryptographic multi-tenant access.</p>
+
+        <ul class="info-features">
+          <li><span class="feature-bullet">✦</span> <div><strong>One-Click Activation</strong> — Immediate access across all authorized clients</div></li>
+          <li><span class="feature-bullet">✦</span> <div><strong>HMAC-Signed Tokens</strong> — Single-use cryptographic verification</div></li>
+          <li><span class="feature-bullet">✦</span> <div><strong>Session Protection</strong> — Guaranteed protection against credential stuffing</div></li>
+        </ul>
+      </div>
+
+      <div class="info-cta">
+        <p class="info-cta-label">Ready to access your account?</p>
+        <a class="btn outline info-cta-btn" href="{{if .SignInURL}}{{.SignInURL}}{{else}}/auth/sign-in{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}{{end}}">
+          Continue to sign in →
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Status / Action Side -->
+  <div class="auth-form-side sign-in-side standalone">
+    <div class="form-inner">
+      <div class="form-header">
+        <h1>{{if .Error}}Verification issue{{else}}Email verified!{{end}}</h1>
+        <p class="card-sub">{{if .Error}}We were unable to verify your email with the provided link.{{else}}Your email address has been confirmed. You can now access your application.{{end}}</p>
+      </div>
+
+      {{if .Error}}
+        <p class="error server-feedback">{{.Error}}</p>
+        <div style="display:grid;gap:12px;margin-top:20px;">
+          <a class="btn primary" href="/auth/sign-in{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">Return to sign in</a>
+          <a class="btn secondary" href="/auth/forgot-password{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">Request new link / Reset</a>
+        </div>
+      {{else}}
+        {{if .Message}}
+          <p class="message server-feedback">{{.Message}}</p>
+        {{else}}
+          <p class="message server-feedback">Email verified. You can sign in.</p>
+        {{end}}
+
+        <div style="display:grid;gap:12px;margin-top:22px;">
+          {{if .SignInURL}}
+            <a class="btn primary" href="{{.SignInURL}}">Continue to {{if .BrandName}}{{.BrandName}}{{else}}application{{end}} →</a>
+          {{else}}
+            <a class="btn primary" href="/auth/sign-in{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">Continue to sign in →</a>
+          {{end}}
+        </div>
+      {{end}}
+
+      <div class="links" style="margin-top:22px;">
+        <a href="/auth/sign-in{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">← Back to sign in</a>
+      </div>
+    </div>
+  </div>
+</div>
 {{end}}

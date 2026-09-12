@@ -2,44 +2,48 @@
 
 /* ------------------------------------------------------------------ *
  * Minimalism & Swiss Style — full light + dark
- * Palette: deep navy / canvas / soft sage / lime-yellow accent.
- * 0px base radius, hairline borders, flat surfaces, no gradients.
+ * Palette: Hot Red (#FF3B3B) / Soft Beige (#FFF4E6) / Canvas
+ * Hairline borders, flat surfaces, concentric radius, subtle depth.
  * ------------------------------------------------------------------ */
 
 :root {
   color-scheme: light;
 
   --color-bg: #ffffff;
-  --color-bg-subtle: #F5F5F5;
-  --color-fg: #051B23;
-  --color-fg-muted: #5D6B70;
-  --color-line: #C4C4C4;
-  --color-line-strong: #051B23;
+  --color-bg-subtle: #FAFAFA;
+  --color-fg: #1C1412;
+  --color-fg-muted: #6B6360;
+  --color-line: #E4DFD9;
+  --color-line-strong: #1C1412;
 
-  --color-accent: #E8FF3F;
-  --color-accent-hover: #BAE02D;
-  --color-accent-fg: #051B23;
+  --color-accent: #FF3B3B;
+  --color-accent-hover: #E03030;
+  --color-accent-fg: #FFFFFF;
 
-  --color-beige: #E3EFD7;
-  --color-taupe: #C4C4C4;
-  --color-grey: #5D6B70;
+  --color-beige: #FFF4E6;
+  --color-taupe: #E4DFD9;
+  --color-grey: #6B6360;
 
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.04);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-    --color-bg: #0E0F11;
-    --color-bg-subtle: #1C1D1F;
-    --color-fg: #F5F6F6;
-    --color-fg-muted: #9D9E9F;
-    --color-line: #353537;
-    --color-line-strong: #F5F6F6;
+  --color-bg: #0E0F11;
+  --color-bg-subtle: #1C1D1F;
+  --color-fg: #F5F6F6;
+  --color-fg-muted: #9D9E9F;
+  --color-line: #353537;
+  --color-line-strong: #F5F6F6;
 
-    --color-accent: #E8FF3F;
-    --color-accent-hover: #BAE02D;
-    --color-accent-fg: #0B0B0C;
+  --color-accent: #FF3B3B;
+  --color-accent-hover: #FF5252;
+  --color-accent-fg: #FFFFFF;
+
+  --color-beige: #261B18;
+  --color-taupe: #353537;
+  --color-grey: #9D9E9F;
 
   --shadow-card: none;
 }
@@ -48,17 +52,21 @@
   color-scheme: light;
 
   --color-bg: #ffffff;
-   --color-bg-subtle: #F5F5F5;
-   --color-fg: #051B23;
-   --color-fg-muted: #5D6B70;
-   --color-line: #C4C4C4;
-   --color-line-strong: #051B23;
+  --color-bg-subtle: #FAFAFA;
+  --color-fg: #1C1412;
+  --color-fg-muted: #6B6360;
+  --color-line: #E4DFD9;
+  --color-line-strong: #1C1412;
 
-   --color-accent: #E8FF3F;
-   --color-accent-hover: #BAE02D;
-   --color-accent-fg: #051B23;
+  --color-accent: #FF3B3B;
+  --color-accent-hover: #E03030;
+  --color-accent-fg: #FFFFFF;
 
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --color-beige: #FFF4E6;
+  --color-taupe: #E4DFD9;
+  --color-grey: #6B6360;
+
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.04);
 }
 
 .brand-logo {

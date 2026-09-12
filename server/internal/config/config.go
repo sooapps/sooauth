@@ -47,10 +47,14 @@ func Load() (Config, error) {
 	loadEnvFiles()
 
 	env := envOr("SOOAUTH_ENV", "development")
+	defaultDBURL := ""
+	if env != "production" {
+		defaultDBURL = "postgres://sooauth:sooauth@localhost:5433/sooauth?sslmode=disable"
+	}
 	cfg := Config{
 		Env:                  env,
 		Port:                 envOr("PORT", "8080"),
-		DatabaseURL:          os.Getenv("DATABASE_URL"),
+		DatabaseURL:          envOr("DATABASE_URL", defaultDBURL),
 		RedisURL:             os.Getenv("REDIS_URL"),
 		AppURL:               envOr("APP_URL", "http://localhost:8080"),
 		APIURL:               envOr("API_URL", "http://localhost:8080"),
@@ -77,7 +81,7 @@ func Load() (Config, error) {
 		WebAuthnOrigin:       envOr("WEBAUTHN_ORIGIN", envOr("APP_URL", "http://localhost:8080")),
 		BrandName:            envOr("BRAND_NAME", "sooauth"),
 		BrandLogoURL:         os.Getenv("BRAND_LOGO_URL"),
-		BrandAccent:          envOr("BRAND_ACCENT", "#E8FF3F"),
+		BrandAccent:          envOr("BRAND_ACCENT", "#FF3B3B"),
 		BillingManualUpgrade: os.Getenv("BILLING_MANUAL_UPGRADE") == "true",
 	}
 	if raw := os.Getenv("MFA_ENCRYPTION_KEY"); raw != "" {

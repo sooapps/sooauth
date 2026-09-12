@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { authUrl } from "../../../lib/site";
+import { EmbedWidgetPlayground } from "../../../components/embed-widget-playground";
 
 export const metadata: Metadata = {
   title: "Embed widget",
@@ -52,7 +53,27 @@ export default function EmbedWidgetPage() {
 ></script>`}</pre>
       </section>
 
-      <section className="mt-10">
+      <section className="mt-12">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-sans text-[22px] font-semibold text-fg">
+              Interactive playground
+            </h2>
+            <p className="mt-1 text-[15px] leading-[1.6] text-fg-muted">
+              Configure options below to see real-time updates and preview your drop-in login widget.
+            </p>
+          </div>
+          <Link
+            href="/playground"
+            className="hidden sm:inline-flex items-center text-xs font-semibold text-accent hover:underline"
+          >
+            Open full page ↗
+          </Link>
+        </div>
+        <EmbedWidgetPlayground />
+      </section>
+
+      <section className="mt-12">
         <h2 className="font-sans text-[22px] font-semibold text-fg">
           Script attributes
         </h2>

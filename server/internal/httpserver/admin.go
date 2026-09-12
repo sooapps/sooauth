@@ -1080,7 +1080,7 @@ func (s *Server) handleDashboardThemePut(w http.ResponseWriter, r *http.Request)
 		logoURL = strings.TrimSpace(body.LogoURL)
 	}
 	if accent == "" {
-		accent = "#E8FF3F"
+		accent = "#FF3B3B"
 	}
 	if canHide {
 		hideBranding = body.HideBranding
