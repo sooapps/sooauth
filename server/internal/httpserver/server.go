@@ -125,6 +125,7 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 		return nil, fmt.Errorf("passkeys: %w", err)
 	}
 
+	accountsStore := store.NewAccounts(db, cfg.PublicBeta)
 	s := &Server{
 		cfg:  cfg,
 		db:   db,
@@ -148,7 +149,7 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 			authSvc,
 			store.NewOAuthProviders(db),
 			store.NewTenants(db),
-			store.NewAccounts(db),
+			accountsStore,
 			ephem,
 			store.NewSocialIdentities(db),
 		),
@@ -164,13 +165,13 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 		tenants:        store.NewTenants(db),
 		oauthClients:   store.NewOAuthClients(db),
 		tenantUsers:    store.NewTenantUsers(db),
-		accounts:       store.NewAccounts(db),
+		accounts:       accountsStore,
 		ephemeral:      ephem,
 		billing: billing.NewService(
 			store.NewSubscriptions(db),
 			store.NewBillingCheckouts(db),
 			store.NewBillingEvents(db),
-			store.NewAccounts(db),
+			accountsStore,
 			[]billing.Provider{
 				billingproviders.NewManual(cfg.BillingManualUpgrade),
 				billingproviders.NewPayTR(),

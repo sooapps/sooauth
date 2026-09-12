@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { adminUrl, signInUrl } from "../lib/site";
+import { Github } from "lucide-react";
+import { adminUrl, githubUrl, signInUrl } from "../lib/site";
 import { buttonClass } from "./ui/button";
 import { Container } from "./ui/layout";
 import { ThemeToggle } from "./ui/theme-toggle";
@@ -48,6 +49,16 @@ export function SiteHeader() {
             className={buttonClass("ghost", "sm", "hidden sm:inline-flex")}
           >
             Dashboard
+          </a>
+          <a
+            href={githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClass("ghost", "sm", "hidden md:inline-flex items-center gap-1.5")}
+            aria-label="GitHub repository"
+          >
+            <Github size={15} />
+            <span>GitHub</span>
           </a>
           <ThemeToggle />
           <a href={signInUrl} className={buttonClass("primary", "sm")}>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Bot, Check, Cpu, Database, KeyRound, Mail, Shield, ShieldCheck, Terminal, X, Zap } from "lucide-react";
+import { AlertTriangle, ArrowRight, Bot, Check, ChevronDown, Cpu, Database, GitPullRequest, Github, HelpCircle, KeyRound, Mail, MessageSquare, Shield, ShieldCheck, Sparkles, Star, Terminal, X, Zap } from "lucide-react";
 import { SiteFooter } from "../components/site-footer";
 import { SiteHeader } from "../components/site-header";
 import { HeroAuthPreview } from "../components/hero-auth-preview";
@@ -452,9 +452,9 @@ curl -sSL https://raw.githubusercontent.com/sooapps/sooauth/main/install.sh | ba
         <Section id="pricing" labelledBy="pricing-heading">
           <SectionHeading
             id="pricing-heading"
-            eyebrow="Simple pricing"
-            title="Start free. Upgrade when you scale."
-            lead="Use hosted Sooauth at auth.sooauth.com. If you need full infrastructure control, the Community Edition is 100% open-source and free to self-host."
+            eyebrow="Simple, developer-first pricing"
+            title="Start free in Cloud. Self-host forever."
+            lead="Sooauth is currently in open public beta: all Cloud Pro features are 100% free with no credit card required. Prefer complete infrastructure ownership? The Community Edition is free and open source forever."
           />
           <div className="mt-12 grid gap-px border border-line bg-line lg:grid-cols-3">
             {pricingTiers.map((tier) => (
@@ -462,34 +462,41 @@ curl -sSL https://raw.githubusercontent.com/sooapps/sooauth/main/install.sh | ba
                 key={tier.name}
                 className={
                   tier.highlight
-                    ? "relative bg-bg-subtle p-8 md:p-10"
-                    : "bg-bg p-8 md:p-10"
+                    ? "relative bg-bg-subtle p-8 md:p-10 flex flex-col justify-between"
+                    : "bg-bg p-8 md:p-10 flex flex-col justify-between"
                 }
               >
-                {tier.highlight && "badge" in tier && tier.badge ? (
-                  <span className="absolute right-8 top-8 border border-line-strong px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-fg">
-                    {tier.badge}
-                  </span>
-                ) : null}
-                <p className="font-mono text-xs uppercase tracking-[0.14em] text-fg-muted">
-                  {tier.name}
-                </p>
-                <p className="mt-4 font-sans text-[40px] font-bold leading-none tracking-[-0.02em] text-fg">
-                  {tier.price}
-                  {tier.cadence ? (
-                    <span className="ml-2 text-[15px] font-normal text-fg-muted">
-                      {tier.cadence}
+                <div>
+                  {tier.highlight && "badge" in tier && tier.badge ? (
+                    <span className="absolute right-8 top-8 border border-line px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent bg-accent/10">
+                      {tier.badge}
                     </span>
                   ) : null}
-                </p>
-                <ul className="mt-6 grid gap-2 text-[15px] leading-[1.5] text-fg-muted">
-                  {tier.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2">
-                      <Check size={14} className="text-fg shrink-0" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
+                  <p className="font-mono text-xs uppercase tracking-[0.14em] text-fg-muted">
+                    {tier.name}
+                  </p>
+                  <p className="mt-4 font-sans text-[40px] font-bold leading-none tracking-[-0.02em] text-fg">
+                    {tier.price}
+                    {tier.cadence ? (
+                      <span className="ml-2 text-[15px] font-normal text-fg-muted">
+                        {tier.cadence}
+                      </span>
+                    ) : null}
+                  </p>
+                  {"description" in tier && tier.description ? (
+                    <p className="mt-3 text-[14px] leading-[1.5] text-fg-muted">
+                      {tier.description}
+                    </p>
+                  ) : null}
+                  <ul className="mt-6 grid gap-2.5 text-[14px] leading-[1.5] text-fg-muted">
+                    {tier.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2">
+                        <Check size={14} className="text-fg shrink-0 mt-0.5" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
                 <a
                   href={tier.cta.href}
                   className={buttonClass(
@@ -503,9 +510,135 @@ curl -sSL https://raw.githubusercontent.com/sooapps/sooauth/main/install.sh | ba
               </article>
             ))}
           </div>
-          <p className="mt-6 font-mono text-xs text-fg-muted">
-            Hosted Sooauth is operated by Sooapps. Community Edition is AGPL-3.0 open source.
-          </p>
+
+          <div className="mt-8 border border-line bg-bg-subtle p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div>
+              <p className="font-sans font-semibold text-fg text-[16px]">
+                🚀 Public Beta Guarantee for Early Adopters
+              </p>
+              <p className="text-[14px] text-fg-muted mt-1 max-w-[65ch]">
+                Build your project on Sooauth Cloud today. When commercial scale tiers roll out in the future, early beta users receive grandfathered lifetime perks with zero surprise charges.
+              </p>
+            </div>
+            <a href={signUpUrl} className={buttonClass("primary", "sm", "shrink-0")}>
+              Claim free account →
+            </a>
+          </div>
+        </Section>
+
+        {/* Open Source & Community */}
+        <Section id="community" labelledBy="community-heading">
+          <SectionHeading
+            id="community-heading"
+            eyebrow="Open source & Community"
+            title="Built in the open. Shape the future of Sooauth."
+            lead="Sooauth is built for developers who believe identity should never be a proprietary black box or a database lock-in. Whether you write Go, TypeScript, design UI, or write documentation, we'd love you to build with us."
+          />
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            <Card className="flex flex-col justify-between">
+              <div>
+                <div className="flex h-10 w-10 items-center justify-center border border-line bg-bg-subtle text-accent">
+                  <Sparkles size={20} />
+                </div>
+                <h3 className="mt-5 font-sans text-[18px] font-semibold tracking-[-0.01em] text-fg">
+                  Good First Issues
+                </h3>
+                <p className="mt-2.5 text-[14px] leading-[1.6] text-fg-muted">
+                  Looking to make your first contribution? We have bite-sized, self-contained tasks specifically curated for newcomers.
+                </p>
+              </div>
+              <a
+                href="https://github.com/sooapps/sooauth/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-fg hover:text-accent transition-colors"
+              >
+                Browse open tasks
+                <ArrowRight size={13} aria-hidden />
+              </a>
+            </Card>
+
+            <Card className="flex flex-col justify-between">
+              <div>
+                <div className="flex h-10 w-10 items-center justify-center border border-line bg-bg-subtle text-accent">
+                  <MessageSquare size={20} />
+                </div>
+                <h3 className="mt-5 font-sans text-[18px] font-semibold tracking-[-0.01em] text-fg">
+                  Discussions &amp; RFCs
+                </h3>
+                <p className="mt-2.5 text-[14px] leading-[1.6] text-fg-muted">
+                  Propose new language SDKs (Python, Rust, FastAPI), vote on upcoming roadmap features, or discuss OIDC architecture.
+                </p>
+              </div>
+              <a
+                href="https://github.com/sooapps/sooauth/discussions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-fg hover:text-accent transition-colors"
+              >
+                Join the conversation
+                <ArrowRight size={13} aria-hidden />
+              </a>
+            </Card>
+
+            <Card className="flex flex-col justify-between">
+              <div>
+                <div className="flex h-10 w-10 items-center justify-center border border-line bg-bg-subtle text-accent">
+                  <GitPullRequest size={20} />
+                </div>
+                <h3 className="mt-5 font-sans text-[18px] font-semibold tracking-[-0.01em] text-fg">
+                  Contributor Roadmap
+                </h3>
+                <p className="mt-2.5 text-[14px] leading-[1.6] text-fg-muted">
+                  Step-by-step local setup with Docker, Go/TypeScript test suites, and our pull request checklist.
+                </p>
+              </div>
+              <a
+                href="https://github.com/sooapps/sooauth/blob/main/CONTRIBUTING.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-fg hover:text-accent transition-colors"
+              >
+                Read CONTRIBUTING.md
+                <ArrowRight size={13} aria-hidden />
+              </a>
+            </Card>
+          </div>
+
+          <div className="mt-8 border border-line bg-bg-subtle p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-line bg-bg text-fg">
+                <Github size={24} />
+              </div>
+              <div>
+                <h4 className="font-sans font-semibold text-fg text-[16px]">
+                  Support Sooauth on GitHub
+                </h4>
+                <p className="text-[14px] text-fg-muted">
+                  Starring the repository helps more developers discover decoupled, open-source identity.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <a
+                href="https://github.com/sooapps/sooauth"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonClass("primary", "sm")}
+              >
+                <Star size={14} className="fill-current" aria-hidden />
+                Star on GitHub
+              </a>
+              <a
+                href="https://github.com/sooapps/sooauth/issues"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonClass("secondary", "sm")}
+              >
+                View all issues
+              </a>
+            </div>
+          </div>
         </Section>
 
         {/* Final CTA */}
@@ -548,19 +681,57 @@ SOOAUTH_REDIRECT_URI=http://localhost:3000/callback`}</pre>
 
         {/* FAQ */}
         <Section id="faq" labelledBy="faq-heading">
-          <SectionHeading id="faq-heading" eyebrow="FAQ" title="Frequently asked questions." />
-          <dl className="mt-10 grid gap-px border border-line bg-line">
-            {faqs.map((item) => (
-              <div key={item.q} className="bg-bg p-6 md:p-8">
-                <dt className="font-sans text-[17px] font-semibold text-fg">
-                  {item.q}
-                </dt>
-                <dd className="mt-2.5 max-w-[65ch] text-[15px] leading-[1.6] text-fg-muted">
-                  {item.a}
-                </dd>
-              </div>
+          <SectionHeading
+            id="faq-heading"
+            eyebrow="Questions & Answers"
+            title="Frequently asked questions."
+            lead="Everything you need to know about decoupled identity, standard OIDC architecture, public beta pricing, and self-hosting."
+          />
+
+          <div className="mt-12 mx-auto max-w-4xl divide-y divide-line border-y border-line">
+            {faqs.map((item, index) => (
+              <details
+                key={item.q}
+                open={index === 0}
+                className="group"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-6 text-left font-sans text-[17px] font-medium tracking-[-0.01em] text-fg transition-colors hover:text-accent select-none [&::-webkit-details-marker]:hidden">
+                  <span>{item.q}</span>
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center text-fg-muted transition-transform duration-200 group-open:rotate-180 group-open:text-accent">
+                    <ChevronDown size={18} aria-hidden />
+                  </span>
+                </summary>
+                <div className="pb-6 pr-6 md:pr-12 text-[15px] leading-[1.7] text-fg-muted">
+                  <p className="max-w-[70ch]">{item.a}</p>
+                </div>
+              </details>
             ))}
-          </dl>
+          </div>
+
+          <div className="mt-12 mx-auto max-w-4xl border border-line bg-bg-subtle p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-line bg-bg text-accent">
+                <HelpCircle size={20} />
+              </div>
+              <div>
+                <p className="font-sans font-semibold text-fg text-[15px]">
+                  Have a question not answered here?
+                </p>
+                <p className="text-[14px] text-fg-muted mt-0.5">
+                  We are active on GitHub Discussions and always happy to chat about identity architecture.
+                </p>
+              </div>
+            </div>
+            <a
+              href="https://github.com/sooapps/sooauth/discussions"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass("secondary", "sm", "shrink-0 inline-flex items-center gap-1.5")}
+            >
+              Ask on Discussions
+              <ArrowRight size={14} aria-hidden />
+            </a>
+          </div>
         </Section>
       </main>
 
