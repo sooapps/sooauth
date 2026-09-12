@@ -55,50 +55,63 @@ export const testimonials = [
 
 export const pricingTiers = [
   {
-    name: "Free",
+    name: "Community",
     price: "$0",
-    cadence: "/ month",
+    cadence: "/ forever",
+    description: "100% open-source under AGPL-3.0. Deploy on your own VPS or Docker stack with complete data sovereignty.",
     features: [
-      "Hosted Sooauth beta",
-      "Standard OIDC + OAuth flows",
-      "Email, passkeys, Google, and GitHub",
-      "Hosted sign-in, verification, and reset",
+      "Single-command Docker Compose setup",
+      "Unlimited users, projects & logins",
+      "Standard OIDC + PKCE + Passkeys",
+      "Google, GitHub, Facebook & X social logins",
+      "Embed widgets & hosted auth UI",
+      "Isolated Postgres with zero DB migrations",
+      "Community support on GitHub Discussions",
     ],
-    cta: { label: "Get started free", href: signUpUrl },
+    cta: { label: "Self-host via Docker", href: "/docs/self-host" },
     highlight: false,
   },
   {
-    name: "Pro",
-    price: "$19",
-    cadence: "/ month",
+    name: "Hosted Cloud",
+    price: "$0",
+    cadence: "/ public beta",
+    description: "Zero infrastructure to manage. High-availability managed cloud hosted at auth.sooauth.com.",
+    badge: "100% Free in Beta",
     features: [
-      "Up to 3 projects",
-      "Custom login branding",
-      "Hide powered-by badge",
-      "Custom OAuth credentials",
+      "Instant setup in under 2 minutes",
+      "All Pro features unlocked completely free",
+      "Custom login branding & accent colors",
+      "Custom OAuth app credentials & redirect URIs",
+      "Email verification & password reset flows",
+      "Permanent grandfathered perks for early adopters",
+      "No credit card required to start",
     ],
-    cta: { label: "Start with free", href: signUpUrl },
+    cta: { label: "Claim free beta account", href: signUpUrl },
     highlight: true,
-    badge: "Popular",
   },
   {
-    name: "Business",
-    price: "$49",
-    cadence: "/ month",
+    name: "Enterprise",
+    price: "Custom",
+    cadence: "/ scale",
+    description: "For scaling teams requiring dedicated VPC isolation, custom SLAs, compliance guarantees, or hands-on migration.",
     features: [
-      "Up to 10 projects",
-      "Everything in Pro",
-      "Priority support",
-      "Organizations, SSO, and SCIM",
-      "Audit exports and advanced RBAC",
-      "SLA and onboarding support",
+      "Dedicated multi-region cloud cluster",
+      "Custom SLA & direct engineering Slack channel",
+      "Enterprise SSO (SAML 2.0 / Okta / Azure AD)",
+      "Automated SCIM user provisioning",
+      "Custom audit exports & SOC 2 compliance support",
+      "White-glove migration from Auth0, Clerk, or Firebase",
     ],
-    cta: { label: "Talk to Sooapps", href: `mailto:${contactEmail}?subject=Sooauth%20Business` },
+    cta: { label: "Talk to Sooapps", href: `mailto:${contactEmail}?subject=Sooauth%20Enterprise` },
     highlight: false,
   },
 ];
 
 export const faqs = [
+  {
+    q: "Why is Sooauth Hosted Cloud currently 100% free?",
+    a: "Sooauth is in active public beta. We want developers to test the DX, connect their AI coding tools, and stress-test our OIDC endpoints without billing friction. All Pro capabilities (custom branding, custom OAuth keys, passkeys, unlimited projects) are completely unlocked for free with no credit card required. Early adopters who build on Sooauth now will receive permanent grandfathered perks.",
+  },
   {
     q: "What makes Sooauth different from Better Auth?",
     a: "Better Auth manages user and session tables directly inside your application database using ORM adapters (Prisma, Drizzle, etc.). This means every auth feature requires schema migrations, schema upkeep, and tight coupling to TypeScript/Node. Sooauth completely decouples authentication: your application database remains 100% clean, and your app simply validates standard OIDC JWTs. Your AI coding assistants won't get stuck in schema migration loops.",
@@ -110,6 +123,10 @@ export const faqs = [
   {
     q: "What makes Sooauth different from Keycloak?",
     a: "Keycloak is an enterprise Java behemoth requiring 1GB+ RAM just to boot, dozens of complex XML/JSON configurations, and significant devops overhead. Sooauth is written in Go, compiles to a lean ~25MB binary, uses minimal memory, boots in milliseconds, and provides modern hosted auth pages out of the box.",
+  },
+  {
+    q: "Can I migrate from Hosted Cloud to self-hosting later?",
+    a: "Yes, 100%. Sooauth strictly decouples auth from proprietary storage models. Because both Hosted Cloud and the Community Edition run identical OIDC schemas and Postgres backends, you can export your data and spin up self-hosted Docker containers whenever your compliance or governance policies require.",
   },
   {
     q: "Why is Sooauth ideal for Vibecoders and AI Agents (Cursor, Claude Code, v0)?",
@@ -126,9 +143,5 @@ export const faqs = [
   {
     q: "Does Sooauth support passkeys and social logins?",
     a: "Yes. Passkeys (WebAuthn biometric login), Google, and GitHub social sign-in can be toggled in one click from the dashboard. Your application doesn't need to import separate OAuth SDKs or manage provider client secrets.",
-  },
-  {
-    q: "Is Sooauth free to use?",
-    a: "The self-hosted Community Edition is 100% free and open source under AGPL-3.0. The hosted cloud service at auth.sooauth.com is currently in free public beta with generous limits for indie hackers and developers.",
   },
 ];

@@ -40,6 +40,7 @@ type Config struct {
 	BrandLogoURL         string
 	BrandAccent          string
 	BillingManualUpgrade bool
+	PublicBeta           bool
 	MFAEncryptionKey     []byte
 }
 
@@ -83,6 +84,7 @@ func Load() (Config, error) {
 		BrandLogoURL:         os.Getenv("BRAND_LOGO_URL"),
 		BrandAccent:          envOr("BRAND_ACCENT", "#FF3B3B"),
 		BillingManualUpgrade: os.Getenv("BILLING_MANUAL_UPGRADE") == "true",
+		PublicBeta:           envOr("SOOAUTH_PUBLIC_BETA", "true") == "true",
 	}
 	if raw := os.Getenv("MFA_ENCRYPTION_KEY"); raw != "" {
 		key, err := decodeMFAEncryptionKey(raw)

@@ -145,6 +145,7 @@ func (s *Server) handleDashboardMe(w http.ResponseWriter, r *http.Request) {
 			"plan_label":    billing.PlanLabel(dash.account.Plan),
 			"max_projects":  billing.MaxProjects(dash.account.Plan),
 			"project_count": len(projects),
+			"is_beta_user":  dash.account.IsBetaUser,
 		},
 		"projects": projectList,
 		"project": map[string]any{

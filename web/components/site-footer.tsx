@@ -62,6 +62,11 @@ export function SiteFooter() {
                 </a>
               </li>
               <li>
+                <a href="#community" className={footLink}>
+                  Community &amp; Open Source
+                </a>
+              </li>
+              <li>
                 <a href="#faq" className={footLink}>
                   FAQ
                 </a>
