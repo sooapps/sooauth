@@ -54,6 +54,8 @@ type Overview struct {
 	Plans             []PlanOffer `json:"plans"`
 	Providers         []ProviderInfo `json:"providers"`
 	ManualUpgrade     bool        `json:"manual_upgrade_enabled"`
+	PublicBeta        bool        `json:"public_beta"`
+	IsBetaUser        bool        `json:"is_beta_user"`
 }
 
 type ProviderInfo struct {
@@ -78,7 +80,7 @@ type UpgradeResult struct {
 	PlanLabel   string `json:"plan_label,omitempty"`
 }
 
-func (s *Service) Overview(ctx context.Context, account *store.Account, manualUpgrade bool) (*Overview, error) {
+func (s *Service) Overview(ctx context.Context, account *store.Account, manualUpgrade bool, publicBeta bool) (*Overview, error) {
 	if account == nil {
 		return nil, errors.New("account not found")
 	}
@@ -110,6 +112,8 @@ func (s *Service) Overview(ctx context.Context, account *store.Account, manualUp
 		Plans:         AllPlans(),
 		Providers:     s.providerList(),
 		ManualUpgrade: manualUpgrade,
+		PublicBeta:    publicBeta,
+		IsBetaUser:    account.IsBetaUser,
 	}, nil
 }
 

@@ -843,16 +843,16 @@
       sel.onchange = async () => {
         const prev = me.project?.id;
         const nextName = sel.options[sel.selectedIndex]?.text || "project";
+        const targetId = sel.value;
         sel.disabled = true;
         try {
-          await api("/projects/" + sel.value + "/select", { method: "POST" });
-          showNotice("Switched to " + nextName + " — refreshing…");
-          await refreshDashboard();
-          showTab(activeTab, false);
+          document.cookie = "sooauth_project=" + encodeURIComponent(targetId) + "; path=/; max-age=31536000; SameSite=Lax";
+          await api("/projects/" + targetId + "/select", { method: "POST" });
+          showNotice("Switched to " + nextName + " — reloading…");
+          location.reload();
         } catch (e) {
           if (prev) sel.value = prev;
           showAlert(e.message);
-        } finally {
           sel.disabled = false;
         }
       };
@@ -1324,7 +1324,7 @@
             <h2>Current plan</h2>
             <p class="desc"><strong>${escapeHtml(data.plan_label)}</strong> · ${data.max_projects} project${data.max_projects === 1 ? "" : "s"} · status ${escapeHtml(data.status)}</p>
             ${data.period_end ? `<p class="desc">Renews on ${escapeHtml(data.period_end)}</p>` : ""}
-            ${data.manual_upgrade_enabled ? `<div class="notice">Manual billing is enabled on this server — upgrades apply instantly without payment.</div>` : ""}
+            ${data.public_beta ? `<div class="notice" style="margin-top:12px; border-left:3px solid var(--accent); background:var(--accent-soft); padding:10px 14px; border-radius:6px; color:var(--text); line-height:1.6;">🚀 <strong>100% Free Public Beta:</strong> You are on the Sooauth Cloud Public Beta. All Pro features and multiple projects are currently 100% free with zero surprise charges. Early adopters receive grandfathered lifetime perks.</div>` : data.manual_upgrade_enabled ? `<div class="notice">Manual billing is enabled on this server — upgrades apply instantly without payment.</div>` : ""}
           </div>
           <div class="plan-grid">
             ${data.plans.map(plan => {
@@ -1333,16 +1333,22 @@
               const canUpgrade = rank[plan.id] > rank[data.plan];
               const paytr = data.providers.find(p => p.id === "paytr");
               const stripe = data.providers.find(p => p.id === "stripe");
+              const priceDisplay = data.public_beta
+                ? (plan.id === "free" ? "$0 <small>Forever</small>" : "$0 <small>/ Public Beta</small>")
+                : escapeHtml(fmtPrice(plan.price_try || (plan.id === "free" ? null : plan.price_try)));
+              const subText = data.public_beta
+                ? (plan.id === "free" ? "Self-hosted & community" : plan.price_try ? `Normally ${(plan.price_try.amount_cents / 100).toLocaleString("tr-TR")} TRY/mo` : "Free during Beta")
+                : (plan.price_usd ? `${escapeHtml(fmtPrice(plan.price_usd))} international` : "");
               return `<article class="plan-card ${current ? "current" : ""}">
                 <h3>${escapeHtml(plan.label)}${current ? " · current" : ""}</h3>
-                <div class="plan-price">${escapeHtml(fmtPrice(plan.price_try || (plan.id === "free" ? null : plan.price_try)))}
-                  ${plan.price_try ? `<small>TR</small>` : ""}
+                <div class="plan-price">${priceDisplay}
+                  ${!data.public_beta && plan.price_try ? `<small>TR</small>` : ""}
                 </div>
-                ${plan.price_usd ? `<div class="desc">${escapeHtml(fmtPrice(plan.price_usd))} international</div>` : ""}
+                ${subText ? `<div class="desc">${escapeHtml(subText)}</div>` : ""}
                 <ul class="plan-features">${plan.features.map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
                 <div class="plan-actions">
                   ${current ? `<span class="badge">Active</span>` : canUpgrade ? `
-                    ${data.manual_upgrade_enabled ? `<button type="button" class="btn btn-primary" data-upgrade="${plan.id}" data-provider="manual">Upgrade now</button>` : ""}
+                    ${data.manual_upgrade_enabled ? `<button type="button" class="btn btn-primary" data-upgrade="${plan.id}" data-provider="manual">${data.public_beta ? "Switch plan (Free Beta)" : "Upgrade now"}</button>` : ""}
                     ${paytr?.available ? `<button type="button" class="btn" data-upgrade="${plan.id}" data-provider="paytr">Pay with PayTR</button>` : `<button type="button" class="btn" disabled title="Coming soon">PayTR (soon)</button>`}
                     ${stripe?.available ? `<button type="button" class="btn" data-upgrade="${plan.id}" data-provider="stripe">Pay with Stripe</button>` : `<button type="button" class="btn" disabled title="Coming soon">Stripe (soon)</button>`}
                   ` : `<span class="desc">Contact support to downgrade.</span>`}

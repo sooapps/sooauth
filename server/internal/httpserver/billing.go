@@ -17,7 +17,7 @@ func (s *Server) handleDashboardBilling(w http.ResponseWriter, r *http.Request) 
 
 	switch r.Method {
 	case http.MethodGet:
-		overview, err := s.billing.Overview(r.Context(), dash.account, s.cfg.BillingManualUpgrade)
+		overview, err := s.billing.Overview(r.Context(), dash.account, s.cfg.BillingManualUpgrade, s.cfg.PublicBeta)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "billing_failed"})
 			return

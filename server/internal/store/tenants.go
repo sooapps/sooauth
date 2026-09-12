@@ -140,7 +140,8 @@ func (t *Tenants) FindByIDForAccount(ctx context.Context, id, accountID uuid.UUI
 		SELECT id, account_id, name, owner_user_id, email_verify_required, email_verify_delivery,
 		       password_min_length, password_require_uppercase, password_require_number, password_require_special,
 		       social_callback_origin, created_at
-		FROM tenants WHERE id = $1 AND account_id = $2
+		FROM tenants 
+		WHERE id = $1 AND (account_id = $2 OR owner_user_id = (SELECT owner_user_id FROM accounts WHERE id = $2))
 	`, id, accountID))
 }
 

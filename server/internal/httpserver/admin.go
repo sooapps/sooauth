@@ -228,8 +228,11 @@ func (s *Server) handleDashboardSelectProject(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	idStr := strings.TrimPrefix(r.URL.Path, "/dashboard/api/projects/")
-	idStr = strings.TrimSuffix(idStr, "/select")
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		idStr = strings.TrimPrefix(r.URL.Path, "/dashboard/api/projects/")
+		idStr = strings.TrimSuffix(idStr, "/select")
+	}
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_id"})
