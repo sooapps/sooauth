@@ -42,6 +42,7 @@ function showMessage(form, message) {
     form.prepend(el);
   }
   el.textContent = message;
+  syncSplitHeight();
 }
 
 function showResendVerification(form, email) {
@@ -67,6 +68,7 @@ function showResendVerification(form, email) {
   });
   wrap.appendChild(btn);
   form.appendChild(wrap);
+  syncSplitHeight();
 }
 
 function showError(form, message) {
@@ -77,10 +79,12 @@ function showError(form, message) {
     form.prepend(el);
   }
   el.textContent = message;
+  syncSplitHeight();
 }
 
 function clearFeedback(form) {
   form.querySelectorAll(".error, .message").forEach((el) => el.remove());
+  syncSplitHeight();
 }
 
 function setSubmitLoading(form, loading, busyLabel) {
@@ -106,6 +110,150 @@ function afterLoginRedirect() {
   location.href = params.get("return_to") || "/dashboard/";
 }
 
+/* ------------------------------------------------------------------
+ * Split Screen Adaptive Height & Mode Toggling
+ * ------------------------------------------------------------------ */
+function syncSplitHeight() {
+  const container = document.getElementById("auth-split-container");
+  if (!container) return;
+
+  if (window.innerWidth <= 860) {
+    container.style.minHeight = "";
+    return;
+  }
+
+  const isSignUp = container.classList.contains("mode-signup");
+  const activeSide = isSignUp
+    ? document.getElementById("sign-up-side")
+    : document.getElementById("sign-in-side");
+  const infoPanel = document.getElementById("auth-panel-info");
+
+  const activeInner = activeSide ? (activeSide.querySelector(".form-inner") || activeSide) : null;
+  const infoInner = infoPanel ? (infoPanel.querySelector(".info-inner") || infoPanel) : null;
+
+  const activeH = activeInner ? activeInner.scrollHeight + 88 : 0;
+  const infoH = infoInner ? infoInner.scrollHeight + 88 : 0;
+
+  const targetH = Math.max(activeH, infoH, 680);
+  container.style.minHeight = targetH + "px";
+}
+
+function setupSplitAuth() {
+  const container = document.getElementById("auth-split-container");
+  if (!container) return;
+
+  const switchBtn = document.getElementById("auth-switch-btn");
+  const ctaLabel = document.getElementById("info-cta-label");
+  const mobileLinks = document.querySelectorAll(".mobile-switch-link");
+
+  function setMode(mode, pushUrl = true) {
+    if (mode === "signup") {
+      container.classList.remove("mode-signin");
+      container.classList.add("mode-signup");
+      if (switchBtn) {
+        switchBtn.dataset.target = "signin";
+        switchBtn.textContent = "Sign in →";
+      }
+      if (ctaLabel) {
+        ctaLabel.textContent = "Already have an account?";
+      }
+      document.title = "Create account · " + (document.title.split(" · ")[1] || "sooauth");
+      if (pushUrl && !location.pathname.endsWith("/sign-up")) {
+        history.pushState(null, "", "/auth/sign-up" + location.search);
+      }
+    } else {
+      container.classList.remove("mode-signup");
+      container.classList.add("mode-signin");
+      if (switchBtn) {
+        switchBtn.dataset.target = "signup";
+        switchBtn.textContent = "Create an account →";
+      }
+      if (ctaLabel) {
+        ctaLabel.textContent = "Don't have an account yet?";
+      }
+      document.title = "Sign in · " + (document.title.split(" · ")[1] || "sooauth");
+      if (pushUrl && !location.pathname.endsWith("/sign-in")) {
+        history.pushState(null, "", "/auth/sign-in" + location.search);
+      }
+    }
+    syncSplitHeight();
+  }
+
+  if (switchBtn) {
+    switchBtn.addEventListener("click", () => {
+      const isCurrentlySignin = container.classList.contains("mode-signin");
+      setMode(isCurrentlySignin ? "signup" : "signin", true);
+    });
+  }
+
+  mobileLinks.forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const href = link.getAttribute("href") || "";
+      setMode(href.includes("sign-up") ? "signup" : "signin", true);
+    });
+  });
+
+  window.addEventListener("popstate", () => {
+    if (location.pathname.includes("sign-up")) {
+      setMode("signup", false);
+    } else if (location.pathname.includes("sign-in")) {
+      setMode("signin", false);
+    }
+  });
+
+  window.addEventListener("resize", syncSplitHeight);
+  syncSplitHeight();
+}
+
+/* ------------------------------------------------------------------
+ * Theme Toggle (Dark / Light)
+ * ------------------------------------------------------------------ */
+function setupThemeToggle() {
+  const toggleBtn = document.getElementById("theme-toggle");
+  if (!toggleBtn) return;
+
+  function getCurrentTheme() {
+    return document.documentElement.getAttribute("data-theme") ||
+      (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    const current = getCurrentTheme();
+    const next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("sooauth_theme", next);
+    } catch (e) {}
+  });
+
+  // Listen for system theme changes if user hasn't explicitly set localStorage
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+      try {
+        if (!localStorage.getItem("sooauth_theme")) {
+          document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+        }
+      } catch (err) {}
+    });
+  }
+}
+
+// Initialize on DOM ready
+document.addEventListener("DOMContentLoaded", () => {
+  setupSplitAuth();
+  setupThemeToggle();
+});
+
+// Direct initialization in case script runs after DOM is ready
+if (document.readyState === "interactive" || document.readyState === "complete") {
+  setupSplitAuth();
+  setupThemeToggle();
+}
+
+/* ------------------------------------------------------------------
+ * Form Submit Handlers
+ * ------------------------------------------------------------------ */
 const signIn = document.getElementById("sign-in-form");
 if (signIn) {
   signIn.addEventListener("submit", async (e) => {

@@ -19,7 +19,7 @@ services:
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       BRAND_NAME: ${BRAND_NAME:-sooauth}
-      BRAND_ACCENT: ${BRAND_ACCENT:-#E8FF3F}
+      BRAND_ACCENT: ${BRAND_ACCENT:-#FF3B3B}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
     depends_on:
       postgres:

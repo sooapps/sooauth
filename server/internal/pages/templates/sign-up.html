@@ -1,21 +1,130 @@
 {{define "sign-up-content"}}
-<section class="card">
-  <h1>Create account</h1>
-  <p class="card-sub">Start your auth project in minutes.</p>
-  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-  {{if .SocialProviders}}
-  <div class="social">
-    {{range .SocialProviders}}
-    <a class="btn secondary" href="/auth/social/{{.}}/start?return_to={{$.ReturnTo | urlquery}}{{if $.TenantID}}&amp;tenant_id={{$.TenantID | urlquery}}{{end}}{{if $.ClientID}}&amp;client_id={{$.ClientID | urlquery}}{{end}}">Continue with {{providerLabel .}}</a>
-    {{end}}
+<div class="auth-split-container mode-signup" id="auth-split-container">
+  <!-- Brand / Explainer Panel -->
+  <aside class="auth-panel-info" id="auth-panel-info">
+    <div class="info-inner">
+      <a class="brand-badge" href="https://sooauth.com">
+        {{if .LogoURL}}
+          <img class="brand-logo-img" src="{{.LogoURL}}" alt="{{.BrandName}}" />
+        {{else}}
+          <img class="brand-logo-img brand-logo-light" src="/auth/static/sooauth-light.png" alt="sooauth" />
+          <img class="brand-logo-img brand-logo-dark" src="/auth/static/sooauth-dark.png" alt="sooauth" />
+        {{end}}
+        <span class="brand-title">{{.BrandName}}</span>
+      </a>
+
+      <div class="info-copy">
+        <h2 class="info-heading" id="info-heading">Authentication built for modern apps.</h2>
+        <p class="info-desc" id="info-desc">OpenID Connect &amp; OAuth 2.1 identity server. Drop-in, self-hostable, with passkeys and multi-tenancy.</p>
+
+        <ul class="info-features">
+          <li><span class="feature-bullet">✦</span> <div><strong>OIDC &amp; OAuth 2.1</strong> — PKCE and refresh rotation</div></li>
+          <li><span class="feature-bullet">✦</span> <div><strong>Biometric Passkeys</strong> — Instant WebAuthn sign-in</div></li>
+          <li><span class="feature-bullet">✦</span> <div><strong>Multi-Tenant Ready</strong> — Independent user pools per project</div></li>
+          <li><span class="feature-bullet">✦</span> <div><strong>Self-Hostable</strong> — Complete data ownership &amp; zero lock-in</div></li>
+        </ul>
+      </div>
+
+      <div class="info-cta">
+        <p class="info-cta-label" id="info-cta-label">Already have an account?</p>
+        <button type="button" class="btn outline info-cta-btn" id="auth-switch-btn" data-target="signin">
+          Sign in →
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sign In Form Side (for instant slide transition) -->
+  <div class="auth-form-side sign-in-side" id="sign-in-side">
+    <div class="form-inner">
+      <div class="form-header">
+        <h1>Sign in</h1>
+        <p class="card-sub">Welcome back. Continue with a provider or email.</p>
+      </div>
+
+      {{if .SocialProviders}}
+      <div class="social">
+        {{range .SocialProviders}}
+        <a class="btn secondary social-{{.}}" href="/auth/social/{{.}}/start?return_to={{$.ReturnTo | urlquery}}{{if $.TenantID}}&amp;tenant_id={{$.TenantID | urlquery}}{{end}}{{if $.ClientID}}&amp;client_id={{$.ClientID | urlquery}}{{end}}">
+          {{if eq . "google"}}
+          <svg class="social-icon" viewBox="0 0 24 24" width="17" height="17"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.27 21.43 7.35 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.27 2.57 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
+          {{else if eq . "github"}}
+          <svg class="social-icon" viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          {{end}}
+          Continue with {{providerLabel .}}
+        </a>
+        {{end}}
+      </div>
+      <div class="divider">or email</div>
+      {{end}}
+
+      <form id="sign-in-form" class="stack">
+        <label>Email
+          <input name="email" type="email" autocomplete="username" required placeholder="you@example.com" />
+        </label>
+        <label>Password
+          <input name="password" type="password" autocomplete="current-password" required placeholder="••••••••" />
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" name="remember_me" value="true" checked />
+          <span>Remember me</span>
+        </label>
+        <button type="submit" class="btn primary">Sign in</button>
+      </form>
+
+      <div class="links">
+        <a href="/auth/forgot-password{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">Forgot password?</a>
+        <a href="/auth/sign-up{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}" class="mobile-switch-link">Create account</a>
+      </div>
+
+      <div class="passkey">
+        <button type="button" id="passkey-sign-in" class="btn ghost">Sign in with passkey</button>
+        <p class="passkey-hint">Optional — biometrics on a device where you registered a passkey.</p>
+      </div>
+    </div>
   </div>
-  <div class="divider">or email</div>
-  {{end}}
-  <form id="sign-up-form" class="stack">
-    <label>Email<input name="email" type="email" autocomplete="username" required /></label>
-    <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" required /></label>
-    <button type="submit">Sign up</button>
-  </form>
-  <div class="links"><a href="/auth/sign-in{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">Already have an account?</a></div>
-</section>
+
+  <!-- Sign Up Form Side -->
+  <div class="auth-form-side sign-up-side" id="sign-up-side">
+    <div class="form-inner">
+      <div class="form-header">
+        <h1>Create account</h1>
+        <p class="card-sub">Start your auth project in minutes.</p>
+      </div>
+
+      {{if .Error}}<p class="error server-feedback">{{.Error}}</p>{{end}}
+      {{if .Message}}<p class="message server-feedback">{{.Message}}</p>{{end}}
+
+      {{if .SocialProviders}}
+      <div class="social">
+        {{range .SocialProviders}}
+        <a class="btn secondary social-{{.}}" href="/auth/social/{{.}}/start?return_to={{$.ReturnTo | urlquery}}{{if $.TenantID}}&amp;tenant_id={{$.TenantID | urlquery}}{{end}}{{if $.ClientID}}&amp;client_id={{$.ClientID | urlquery}}{{end}}">
+          {{if eq . "google"}}
+          <svg class="social-icon" viewBox="0 0 24 24" width="17" height="17"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.27 21.43 7.35 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.27 2.57 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
+          {{else if eq . "github"}}
+          <svg class="social-icon" viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          {{end}}
+          Continue with {{providerLabel .}}
+        </a>
+        {{end}}
+      </div>
+      <div class="divider">or email</div>
+      {{end}}
+
+      <form id="sign-up-form" class="stack">
+        <label>Email
+          <input name="email" type="email" autocomplete="username" required placeholder="you@example.com" />
+        </label>
+        <label>Password
+          <input name="password" type="password" autocomplete="new-password" minlength="8" required placeholder="Minimum 8 characters" />
+        </label>
+        <button type="submit" class="btn primary">Sign up</button>
+      </form>
+
+      <div class="links">
+        <a href="/auth/sign-in{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}" class="mobile-switch-link">Already have an account? Sign in</a>
+      </div>
+    </div>
+  </div>
+</div>
 {{end}}

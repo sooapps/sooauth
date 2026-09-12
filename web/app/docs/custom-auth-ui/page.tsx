@@ -69,7 +69,7 @@ export default function CustomAuthUiPage() {
   "issuer": "${issuer}",
   "providers": ["google", "github"],
   "brand_name": "My App",
-  "accent_color": "#E8FF3F",
+  "accent_color": "#FF3B3B",
   "email_verify_required": true,
   "email_verify_delivery": "link",
   "password_policy": {
