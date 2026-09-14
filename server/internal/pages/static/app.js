@@ -14,19 +14,26 @@ async function postJSON(path, body) {
   return data;
 }
 
+function t(key, fallback) {
+  const dict = window.__I18N__ || {};
+  return dict[key] || fallback || key;
+}
+
 const friendlyErrors = {
-  invalid_credentials: "Wrong email or password.",
-  email_not_verified: "Verify your email before signing in.",
-  email_delivery_failed: "Email could not be sent — server SMTP may be misconfigured.",
-  "email already registered": "This email is already registered. Sign in or reset your password.",
-  rate_limited: "Too many attempts. Wait a minute.",
-  signin_failed: "Sign-in failed. Try again.",
-  request_failed: "Something went wrong. Try again.",
-  passkey_failed: "Passkey sign-in failed. Use email or Google.",
+  invalid_credentials: () => t("js.invalid_credentials", "Wrong email or password."),
+  email_not_verified: () => t("js.email_not_verified_short", "Verify your email before signing in."),
+  email_delivery_failed: () => t("js.email_delivery_failed", "Email could not be sent — server SMTP may be misconfigured."),
+  "email already registered": () => t("js.email_already_registered", "This email is already registered. Sign in or reset your password."),
+  rate_limited: () => t("js.rate_limited_short", "Too many attempts. Wait a minute."),
+  signin_failed: () => t("js.signin_failed", "Sign-in failed. Try again."),
+  request_failed: () => t("js.request_failed", "Something went wrong. Try again."),
+  passkey_failed: () => t("js.passkey_failed", "Passkey sign-in failed. Use email or Google."),
 };
 
 function humanError(code) {
-  return friendlyErrors[code] || "Something went wrong. Try again.";
+  const fn = friendlyErrors[code];
+  if (typeof fn === "function") return fn();
+  return t("js.generic_error", "Something went wrong. Try again.");
 }
 
 function errorText(err) {
@@ -54,12 +61,12 @@ function showResendVerification(form, email) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "btn ghost";
-  btn.textContent = "Resend verification email";
+  btn.textContent = t("js.resend_verification", "Resend verification email");
   btn.addEventListener("click", async () => {
     btn.disabled = true;
     try {
       await postJSON("/auth/resend-verification", { email });
-      showMessage(form, "Verification email sent. Check inbox and spam.");
+      showMessage(form, t("js.verification_sent", "Verification email sent. Check inbox and spam."));
     } catch (err) {
       showError(form, errorText(err));
     } finally {
@@ -97,7 +104,7 @@ function setSubmitLoading(form, loading, busyLabel) {
   btn.setAttribute("aria-busy", loading ? "true" : "false");
   if (loading) {
     btn.classList.add("is-loading");
-    btn.textContent = busyLabel || "Please wait…";
+    btn.textContent = busyLabel || t("js.please_wait", "Please wait…");
   } else {
     btn.classList.remove("is-loading");
     btn.textContent = btn.dataset.defaultLabel;
@@ -152,12 +159,12 @@ function setupSplitAuth() {
       container.classList.add("mode-signup");
       if (switchBtn) {
         switchBtn.dataset.target = "signin";
-        switchBtn.textContent = "Sign in →";
+        switchBtn.textContent = t("js.cta_sign_in", "Sign in →");
       }
       if (ctaLabel) {
-        ctaLabel.textContent = "Already have an account?";
+        ctaLabel.textContent = t("js.cta_label_have_account", "Already have an account?");
       }
-      document.title = "Create account · " + (document.title.split(" · ")[1] || "sooauth");
+      document.title = t("js.title_sign_up", "Create account") + " · " + (document.title.split(" · ")[1] || "sooauth");
       if (pushUrl && !location.pathname.endsWith("/sign-up")) {
         history.pushState(null, "", "/auth/sign-up" + location.search);
       }
@@ -166,12 +173,12 @@ function setupSplitAuth() {
       container.classList.add("mode-signin");
       if (switchBtn) {
         switchBtn.dataset.target = "signup";
-        switchBtn.textContent = "Create an account →";
+        switchBtn.textContent = t("js.cta_create_account", "Create an account →");
       }
       if (ctaLabel) {
-        ctaLabel.textContent = "Don't have an account yet?";
+        ctaLabel.textContent = t("js.cta_label_no_account", "Don't have an account yet?");
       }
-      document.title = "Sign in · " + (document.title.split(" · ")[1] || "sooauth");
+      document.title = t("js.title_sign_in", "Sign in") + " · " + (document.title.split(" · ")[1] || "sooauth");
       if (pushUrl && !location.pathname.endsWith("/sign-in")) {
         history.pushState(null, "", "/auth/sign-in" + location.search);
       }
@@ -260,7 +267,7 @@ if (signIn) {
     e.preventDefault();
     clearFeedback(signIn);
     signIn.querySelector(".resend-wrap")?.remove();
-    const stopLoading = setSubmitLoading(signIn, true, "Signing in…");
+    const stopLoading = setSubmitLoading(signIn, true, t("js.signing_in", "Signing in…"));
     const fd = new FormData(signIn);
     const rememberMeInput = signIn.querySelector('input[name="remember_me"]');
     const rememberMe = rememberMeInput ? rememberMeInput.checked : true;
@@ -271,7 +278,7 @@ if (signIn) {
         remember_me: rememberMe,
       });
       stopLoading();
-      setSubmitLoading(signIn, true, "Redirecting…");
+      setSubmitLoading(signIn, true, t("js.redirecting", "Redirecting…"));
       afterLoginRedirect();
     } catch (err) {
       stopLoading();
@@ -289,7 +296,7 @@ if (signUp) {
   signUp.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearFeedback(signUp);
-    const stopLoading = setSubmitLoading(signUp, true, "Creating account…");
+    const stopLoading = setSubmitLoading(signUp, true, t("js.creating", "Creating account…"));
     const fd = new FormData(signUp);
     try {
       await postJSON("/auth/sign-up", {
@@ -297,8 +304,9 @@ if (signUp) {
         password: fd.get("password"),
       });
       stopLoading();
-      setSubmitLoading(signUp, true, "Redirecting…");
-      location.href = "/auth/sign-in?message=Check+your+email+to+verify";
+      setSubmitLoading(signUp, true, t("js.redirecting", "Redirecting…"));
+      const msg = encodeURIComponent(t("js.verify_email_message", "Check your email to verify"));
+      location.href = "/auth/sign-in?message=" + msg;
     } catch (err) {
       stopLoading();
       showError(signUp, errorText(err));
@@ -311,7 +319,7 @@ if (forgot) {
   forgot.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearFeedback(forgot);
-    const stopLoading = setSubmitLoading(forgot, true, "Sending…");
+    const stopLoading = setSubmitLoading(forgot, true, t("js.sending", "Sending…"));
     const fd = new FormData(forgot);
     const clientId = forgot.dataset.clientId || "";
     const returnTo = forgot.dataset.returnTo || "";
@@ -323,8 +331,8 @@ if (forgot) {
       });
       stopLoading();
       const msg = res && res.delivery === "code"
-        ? "If an account exists, we sent a 6-digit reset code to your email."
-        : "If an account exists, we sent reset instructions.";
+        ? t("js.forgot_sent_code", "If an account exists, we sent a 6-digit reset code to your email.")
+        : t("js.forgot_sent_link", "If an account exists, we sent reset instructions.");
       showMessage(forgot, msg);
     } catch (err) {
       stopLoading();
@@ -338,7 +346,7 @@ if (reset) {
   reset.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearFeedback(reset);
-    const stopLoading = setSubmitLoading(reset, true, "Updating…");
+    const stopLoading = setSubmitLoading(reset, true, t("js.updating", "Updating…"));
     const fd = new FormData(reset);
     const clientId = reset.dataset.clientId || "";
     const returnTo = reset.dataset.returnTo || "";
@@ -348,12 +356,12 @@ if (reset) {
         password: fd.get("password"),
       });
       stopLoading();
-      setSubmitLoading(reset, true, "Redirecting…");
+      setSubmitLoading(reset, true, t("js.redirecting", "Redirecting…"));
       if (returnTo) {
         location.href = returnTo;
       } else {
         const q = new URLSearchParams();
-        q.set("message", "Password updated");
+        q.set("message", t("js.password_updated", "Password updated"));
         if (clientId) q.set("client_id", clientId);
         location.href = "/auth/sign-in?" + q.toString();
       }
@@ -371,7 +379,7 @@ if (passkeyBtn) {
     const emailInput = form?.querySelector('input[name="email"]');
     const email = emailInput?.value?.trim();
     if (!email) {
-      showError(form, "Enter your email first.");
+      showError(form, t("js.enter_email_first", "Enter your email first."));
       emailInput?.focus();
       return;
     }

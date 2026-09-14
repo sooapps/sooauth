@@ -11,11 +11,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sooapps/sooauth/server/internal/auth"
+	"github.com/sooapps/sooauth/server/internal/i18n"
 	"github.com/sooapps/sooauth/server/internal/passwordpolicy"
 	"github.com/sooapps/sooauth/server/internal/store"
 )
 
-func (s *Server) signUpAppUser(ctx context.Context, clientID, email, password, returnTo, ip string) error {
+func (s *Server) signUpAppUser(ctx context.Context, clientID, email, password, returnTo, ip, lang string) error {
 	client, err := s.oauthClients.FindByClientID(ctx, clientID)
 	if err != nil || client == nil || client.TenantID == nil {
 		return store.ErrInvalidClient
@@ -59,6 +60,7 @@ func (s *Server) signUpAppUser(ctx context.Context, clientID, email, password, r
 		Delivery:  tenant.VerifyDelivery(),
 		ClientID:  clientID,
 		ReturnTo:  appReturnTo,
+		Lang:      lang,
 	}); err != nil {
 		_ = s.users.DeleteUnverified(ctx, user.ID)
 		return fmt.Errorf("%w", auth.ErrEmailDelivery)
@@ -90,6 +92,7 @@ func (s *Server) resendAppVerification(r *http.Request, clientID, email, returnT
 		Delivery:  tenant.VerifyDelivery(),
 		ClientID:  clientID,
 		ReturnTo:  resolveAppReturnTo(returnTo, s.cfg.AppURL, client),
+		Lang:      i18n.Resolve(r, tenant.DefaultLocale),
 	}, tenant.ID, email, clientIP(r))
 }
 

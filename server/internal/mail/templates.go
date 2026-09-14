@@ -9,6 +9,7 @@ import (
 type Transactional struct {
 	BrandName string
 	AppURL    string
+	Lang      string
 }
 
 func (t Transactional) brand() string {

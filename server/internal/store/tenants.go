@@ -26,6 +26,7 @@ type Tenant struct {
 	PasswordRequireNumber  bool
 	PasswordRequireSpecial bool
 	SocialCallbackOrigin   string
+	DefaultLocale          string
 	CreatedAt              time.Time
 }
 
@@ -50,6 +51,10 @@ func NewTenants(db *pgxpool.Pool) *Tenants {
 	return &Tenants{db: db}
 }
 
+const tenantSelectCols = `id, account_id, name, owner_user_id, email_verify_required, email_verify_delivery,
+		       password_min_length, password_require_uppercase, password_require_number, password_require_special,
+		       social_callback_origin, default_locale, created_at`
+
 func (t *Tenants) scanTenant(row pgx.Row) (*Tenant, error) {
 	var tenant Tenant
 	if err := row.Scan(
@@ -64,6 +69,7 @@ func (t *Tenants) scanTenant(row pgx.Row) (*Tenant, error) {
 		&tenant.PasswordRequireNumber,
 		&tenant.PasswordRequireSpecial,
 		&tenant.SocialCallbackOrigin,
+		&tenant.DefaultLocale,
 		&tenant.CreatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -71,14 +77,15 @@ func (t *Tenants) scanTenant(row pgx.Row) (*Tenant, error) {
 		}
 		return nil, err
 	}
+	if tenant.DefaultLocale == "" {
+		tenant.DefaultLocale = "en"
+	}
 	return &tenant, nil
 }
 
 func (t *Tenants) FindByOwner(ctx context.Context, ownerID uuid.UUID) (*Tenant, error) {
 	return t.scanTenant(t.db.QueryRow(ctx, `
-		SELECT id, account_id, name, owner_user_id, email_verify_required, email_verify_delivery,
-		       password_min_length, password_require_uppercase, password_require_number, password_require_special,
-		       social_callback_origin, created_at
+		SELECT `+tenantSelectCols+`
 		FROM tenants WHERE owner_user_id = $1
 		ORDER BY created_at ASC LIMIT 1
 	`, ownerID))
@@ -86,9 +93,7 @@ func (t *Tenants) FindByOwner(ctx context.Context, ownerID uuid.UUID) (*Tenant, 
 
 func (t *Tenants) ListByAccount(ctx context.Context, accountID uuid.UUID) ([]Tenant, error) {
 	rows, err := t.db.Query(ctx, `
-		SELECT id, account_id, name, owner_user_id, email_verify_required, email_verify_delivery,
-		       password_min_length, password_require_uppercase, password_require_number, password_require_special,
-		       social_callback_origin, created_at
+		SELECT `+tenantSelectCols+`
 		FROM tenants WHERE account_id = $1
 		ORDER BY created_at ASC
 	`, accountID)
@@ -111,9 +116,13 @@ func (t *Tenants) ListByAccount(ctx context.Context, accountID uuid.UUID) ([]Ten
 			&tenant.PasswordRequireNumber,
 			&tenant.PasswordRequireSpecial,
 			&tenant.SocialCallbackOrigin,
+			&tenant.DefaultLocale,
 			&tenant.CreatedAt,
 		); err != nil {
 			return nil, err
+		}
+		if tenant.DefaultLocale == "" {
+			tenant.DefaultLocale = "en"
 		}
 		out = append(out, tenant)
 	}
@@ -128,18 +137,14 @@ func (t *Tenants) CountByAccount(ctx context.Context, accountID uuid.UUID) (int,
 
 func (t *Tenants) FindByID(ctx context.Context, id uuid.UUID) (*Tenant, error) {
 	return t.scanTenant(t.db.QueryRow(ctx, `
-		SELECT id, account_id, name, owner_user_id, email_verify_required, email_verify_delivery,
-		       password_min_length, password_require_uppercase, password_require_number, password_require_special,
-		       social_callback_origin, created_at
+		SELECT `+tenantSelectCols+`
 		FROM tenants WHERE id = $1
 	`, id))
 }
 
 func (t *Tenants) FindByIDForAccount(ctx context.Context, id, accountID uuid.UUID) (*Tenant, error) {
 	return t.scanTenant(t.db.QueryRow(ctx, `
-		SELECT id, account_id, name, owner_user_id, email_verify_required, email_verify_delivery,
-		       password_min_length, password_require_uppercase, password_require_number, password_require_special,
-		       social_callback_origin, created_at
+		SELECT `+tenantSelectCols+`
 		FROM tenants 
 		WHERE id = $1 AND (account_id = $2 OR owner_user_id = (SELECT owner_user_id FROM accounts WHERE id = $2))
 	`, id, accountID))
@@ -166,15 +171,25 @@ func (t *Tenants) Create(ctx context.Context, accountID, ownerID uuid.UUID, name
 		PasswordRequireUpper:   false,
 		PasswordRequireNumber:  false,
 		PasswordRequireSpecial: false,
+		DefaultLocale:          "en",
 		CreatedAt:              now,
 	}, nil
 }
 
-func (t *Tenants) UpdateSettings(ctx context.Context, id uuid.UUID, name string, emailVerifyRequired bool, delivery emailverify.Delivery, policy passwordpolicy.Policy) error {
+func NormalizeLocale(locale string) string {
+	locale = strings.ToLower(strings.TrimSpace(locale))
+	if locale == "tr" {
+		return "tr"
+	}
+	return "en"
+}
+
+func (t *Tenants) UpdateSettings(ctx context.Context, id uuid.UUID, name string, emailVerifyRequired bool, delivery emailverify.Delivery, policy passwordpolicy.Policy, defaultLocale string) error {
 	if !delivery.Valid() {
 		delivery = emailverify.DeliveryLink
 	}
 	policy = policy.Normalize()
+	defaultLocale = NormalizeLocale(defaultLocale)
 	_, err := t.db.Exec(ctx, `
 		UPDATE tenants SET
 			name = $2,
@@ -183,9 +198,10 @@ func (t *Tenants) UpdateSettings(ctx context.Context, id uuid.UUID, name string,
 			password_min_length = $5,
 			password_require_uppercase = $6,
 			password_require_number = $7,
-			password_require_special = $8
+			password_require_special = $8,
+			default_locale = $9
 		WHERE id = $1
-	`, id, name, emailVerifyRequired, delivery.String(), policy.MinLength, policy.RequireUppercase, policy.RequireNumber, policy.RequireSpecial)
+	`, id, name, emailVerifyRequired, delivery.String(), policy.MinLength, policy.RequireUppercase, policy.RequireNumber, policy.RequireSpecial, defaultLocale)
 	return err
 }
 

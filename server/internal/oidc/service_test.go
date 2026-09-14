@@ -87,7 +87,7 @@ func TestOIDCAuthorizationCodeFlow(t *testing.T) {
 	email := "m5-oidc@sooauth.local"
 	_, _ = db.Exec(ctx, `DELETE FROM users WHERE email = $1`, email)
 
-	if err := authSvc.SignUp(ctx, email, "password-one-two", "127.0.0.1"); err != nil {
+	if err := authSvc.SignUp(ctx, email, "password-one-two", "127.0.0.1", ""); err != nil {
 		t.Fatal(err)
 	}
 	user, _, err := store.NewUsers(db).FindByEmail(ctx, email)

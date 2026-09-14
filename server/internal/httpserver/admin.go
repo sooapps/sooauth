@@ -264,6 +264,7 @@ func (s *Server) handleDashboardProject(w http.ResponseWriter, r *http.Request) 
 			"password_require_number":  policy.RequireNumber,
 			"password_require_special": policy.RequireSpecial,
 			"password_hint":            policy.Describe(),
+			"default_locale":           store.NormalizeLocale(dash.tenant.DefaultLocale),
 		})
 		return
 	}
@@ -281,6 +282,7 @@ func (s *Server) handleDashboardProject(w http.ResponseWriter, r *http.Request) 
 		PasswordRequireUpper   bool   `json:"password_require_upper"`
 		PasswordRequireNumber  bool   `json:"password_require_number"`
 		PasswordRequireSpecial bool   `json:"password_require_special"`
+		DefaultLocale          string `json:"default_locale"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
@@ -296,7 +298,11 @@ func (s *Server) handleDashboardProject(w http.ResponseWriter, r *http.Request) 
 		RequireNumber:    body.PasswordRequireNumber,
 		RequireSpecial:   body.PasswordRequireSpecial,
 	}.Normalize()
-	if err := s.tenants.UpdateSettings(r.Context(), dash.tenant.ID, name, body.EmailVerifyRequired, emailverify.ParseDelivery(body.EmailVerifyDelivery), policy); err != nil {
+	locale := body.DefaultLocale
+	if strings.TrimSpace(locale) == "" {
+		locale = dash.tenant.DefaultLocale
+	}
+	if err := s.tenants.UpdateSettings(r.Context(), dash.tenant.ID, name, body.EmailVerifyRequired, emailverify.ParseDelivery(body.EmailVerifyDelivery), policy, locale); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save_failed"})
 		return
 	}
@@ -591,6 +597,7 @@ func (s *Server) handleDashboardResendUserVerification(w http.ResponseWriter, r 
 		Delivery:  dash.tenant.VerifyDelivery(),
 		ClientID:  client.ClientID,
 		ReturnTo:  resolveAppReturnTo("", s.cfg.AppURL, client),
+		Lang:      store.NormalizeLocale(dash.tenant.DefaultLocale),
 	}, dash.tenant.ID, user.Email, clientIP(r))
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})

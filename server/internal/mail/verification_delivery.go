@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"html"
 	"strings"
+
+	"github.com/sooapps/sooauth/server/internal/i18n"
 )
 
 type VerificationDelivery struct {
@@ -11,56 +13,64 @@ type VerificationDelivery struct {
 	Code    string
 }
 
+func (t Transactional) lang() string {
+	return i18n.Normalize(t.Lang)
+}
+
 func (t Transactional) VerificationDeliveryEmail(d VerificationDelivery, appScoped bool) (subject, plain, htmlBody string) {
 	brand := t.brand()
+	lang := t.lang()
 	hasLink := strings.TrimSpace(d.LinkURL) != ""
 	hasCode := strings.TrimSpace(d.Code) != ""
 
-	subject = fmt.Sprintf("Confirm your %s account", brand)
+	subject = fmt.Sprintf(i18n.T(lang, "mail.verify.subject"), brand)
 
 	var lead, footer string
 	if appScoped {
-		footer = fmt.Sprintf("Authentication for %s is provided by sooauth. If you didn't sign up, you can safely ignore this email.", brand)
+		footer = fmt.Sprintf(i18n.T(lang, "mail.verify.app.footer"), brand)
 		switch {
 		case hasLink && hasCode:
-			lead = fmt.Sprintf("You signed up for %s. Confirm your email using the button below or enter the 6-digit code in the app.", brand)
+			lead = fmt.Sprintf(i18n.T(lang, "mail.verify.app.lead_both"), brand)
 		case hasCode:
-			lead = fmt.Sprintf("You signed up for %s. Enter this 6-digit code in the app to verify your email.", brand)
+			lead = fmt.Sprintf(i18n.T(lang, "mail.verify.app.lead_code"), brand)
 		default:
-			lead = fmt.Sprintf("You signed up for %s. Tap the button below to verify your email and finish creating your account.", brand)
+			lead = fmt.Sprintf(i18n.T(lang, "mail.verify.app.lead_link"), brand)
 		}
 	} else {
-		footer = fmt.Sprintf("If you didn't create a %s account, you can safely ignore this email.", brand)
+		footer = fmt.Sprintf(i18n.T(lang, "mail.verify.platform.footer"), brand)
 		switch {
 		case hasLink && hasCode:
-			lead = fmt.Sprintf("Thanks for signing up for %s. Confirm your email with the link below or the 6-digit code.", brand)
+			lead = fmt.Sprintf(i18n.T(lang, "mail.verify.platform.lead_both"), brand)
 		case hasCode:
-			lead = fmt.Sprintf("Thanks for signing up for %s. Enter this 6-digit code to verify your email.", brand)
+			lead = fmt.Sprintf(i18n.T(lang, "mail.verify.platform.lead_code"), brand)
 		default:
-			lead = fmt.Sprintf("Thanks for signing up for %s. Tap the button below to verify your address and finish setting up your account.", brand)
+			lead = fmt.Sprintf(i18n.T(lang, "mail.verify.platform.lead_link"), brand)
 		}
 	}
 
 	var plainParts []string
-	plainParts = append(plainParts, fmt.Sprintf("Hi,\n\n%s", lead))
+	plainParts = append(plainParts, fmt.Sprintf("%s\n\n%s", i18n.T(lang, "mail.verify.hi"), lead))
 	if hasCode {
-		plainParts = append(plainParts, fmt.Sprintf("\nYour verification code: %s", d.Code))
+		plainParts = append(plainParts, fmt.Sprintf("\n"+i18n.T(lang, "mail.verify.code_label"), d.Code))
 	}
 	if hasLink {
-		plainParts = append(plainParts, fmt.Sprintf("\nOr confirm with this link:\n%s", d.LinkURL))
+		plainParts = append(plainParts, fmt.Sprintf("\n"+i18n.T(lang, "mail.verify.or_link"), d.LinkURL))
 	}
-	plainParts = append(plainParts, "\nThis expires in 24 hours.")
+	plainParts = append(plainParts, "\n"+i18n.T(lang, "mail.verify.expires"))
 	plain = strings.Join(plainParts, "") + fmt.Sprintf("\n\n— %s\n%s", brand, strings.TrimSuffix(t.AppURL, "/"))
 
 	htmlBody = layoutVerificationEmail(verificationLayout{
 		Brand:   brand,
-		Title:   "Confirm your email",
+		Title:   i18n.T(lang, "mail.verify.title"),
 		Lead:    lead,
 		LinkURL: d.LinkURL,
 		Code:    d.Code,
-		Note:    "This expires in 24 hours.",
+		Note:    i18n.T(lang, "mail.verify.expires"),
 		Footer:  footer,
 		AppURL:  strings.TrimSuffix(t.AppURL, "/"),
+		Lang:    lang,
+		ButtonText: i18n.T(lang, "mail.verify.button"),
+		CopyLink:   i18n.T(lang, "mail.copy_link"),
 	})
 
 	return subject, plain, htmlBody
@@ -76,6 +86,8 @@ type verificationLayout struct {
 	Note       string
 	Footer     string
 	AppURL     string
+	Lang       string
+	CopyLink   string
 }
 
 func layoutVerificationEmail(l verificationLayout) string {
@@ -86,10 +98,15 @@ func layoutVerificationEmail(l verificationLayout) string {
 	if btnText == "" {
 		btnText = "Confirm email"
 	}
+	lang := i18n.Normalize(l.Lang)
+	copyLink := strings.TrimSpace(l.CopyLink)
+	if copyLink == "" {
+		copyLink = i18n.T(lang, "mail.copy_link")
+	}
 
 	var body strings.Builder
 	body.WriteString(fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
+<html lang="%s">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -110,6 +127,7 @@ func layoutVerificationEmail(l verificationLayout) string {
           <tr>
             <td style="padding:16px 32px 0;font-size:15px;line-height:1.6;color:#6B6360;">%s</td>
           </tr>`,
+		html.EscapeString(lang),
 		html.EscapeString(l.Title),
 		html.EscapeString(l.Lead),
 		html.EscapeString(l.Brand),
@@ -134,11 +152,12 @@ func layoutVerificationEmail(l verificationLayout) string {
             </td>
           </tr>
           <tr>
-            <td style="padding:24px 32px 0;font-size:12px;line-height:1.6;color:#5D6B70;word-break:break-all;">Or copy this link:<br><a href="%s" style="color:#051B23;">%s</a></td>
+            <td style="padding:24px 32px 0;font-size:12px;line-height:1.6;color:#5D6B70;word-break:break-all;">%s<br><a href="%s" style="color:#051B23;">%s</a></td>
           </tr>`,
 			html.EscapeString(l.LinkURL),
 			accent,
 			html.EscapeString(btnText),
+			html.EscapeString(copyLink),
 			html.EscapeString(l.LinkURL),
 			html.EscapeString(l.LinkURL),
 		))
@@ -174,61 +193,62 @@ type PasswordResetDelivery struct {
 
 func (t Transactional) PasswordResetDeliveryEmail(d PasswordResetDelivery, appScoped bool) (subject, plain, htmlBody string) {
 	brand := t.brand()
+	lang := t.lang()
 	hasCode := strings.TrimSpace(d.Code) != ""
 
-	subject = fmt.Sprintf("Reset your %s password", brand)
+	subject = fmt.Sprintf(i18n.T(lang, "mail.reset.subject"), brand)
 
 	var lead, footer string
 	if appScoped {
-		footer = fmt.Sprintf("Authentication for %s is provided by sooauth. If you didn't request a password reset, you can safely ignore this email.", brand)
+		footer = fmt.Sprintf(i18n.T(lang, "mail.reset.app.footer"), brand)
 	} else {
-		footer = "If you didn't request a password reset, you can safely ignore this email."
+		footer = i18n.T(lang, "mail.reset.footer")
 	}
 
 	if hasCode {
-		lead = fmt.Sprintf("We received a request to reset your %s password. Enter this 6-digit code in the app to set a new password.", brand)
-		plain = fmt.Sprintf(`Hi,
-
-We received a request to reset your %s password. Enter this 6-digit code in the app:
-
-Your password reset code: %s
-
-This code expires in 15 minutes. If you didn't request this, ignore this email.
-
-— %s
-%s`, brand, d.Code, brand, strings.TrimSuffix(t.AppURL, "/"))
+		lead = fmt.Sprintf(i18n.T(lang, "mail.reset.lead_code_app"), brand)
+		plain = fmt.Sprintf("%s\n\n%s\n\n%s\n\n%s\n\n— %s\n%s",
+			i18n.T(lang, "mail.reset.hi"),
+			lead,
+			fmt.Sprintf(i18n.T(lang, "mail.reset.code_label"), d.Code),
+			i18n.T(lang, "mail.reset.code_expires"),
+			brand,
+			strings.TrimSuffix(t.AppURL, "/"),
+		)
 
 		htmlBody = layoutVerificationEmail(verificationLayout{
 			Brand:   brand,
-			Title:   "Reset your password",
+			Title:   i18n.T(lang, "mail.reset.title"),
 			Lead:    lead,
 			Code:    d.Code,
-			Note:    "This code expires in 15 minutes.",
+			Note:    i18n.T(lang, "mail.reset.code_expires"),
 			Footer:  footer,
 			AppURL:  strings.TrimSuffix(t.AppURL, "/"),
+			Lang:    lang,
+			CopyLink: i18n.T(lang, "mail.copy_link"),
 		})
 	} else {
-		lead = fmt.Sprintf("We received a request to reset your %s password. Tap the button below to choose a new password.", brand)
-		plain = fmt.Sprintf(`Hi,
-
-We received a request to reset your %s password. Open this link to choose a new password:
-
-%s
-
-This link expires in 1 hour. If you didn't request a reset, ignore this email.
-
-— %s
-%s`, brand, d.LinkURL, brand, strings.TrimSuffix(t.AppURL, "/"))
+		lead = fmt.Sprintf(i18n.T(lang, "mail.reset.lead_link"), brand)
+		plain = fmt.Sprintf("%s\n\n%s\n\n%s\n\n%s\n\n— %s\n%s",
+			i18n.T(lang, "mail.reset.hi"),
+			lead,
+			d.LinkURL,
+			i18n.T(lang, "mail.reset.expires"),
+			brand,
+			strings.TrimSuffix(t.AppURL, "/"),
+		)
 
 		htmlBody = layoutVerificationEmail(verificationLayout{
 			Brand:      brand,
-			Title:      "Reset your password",
+			Title:      i18n.T(lang, "mail.reset.title"),
 			Lead:       lead,
-			ButtonText: "Reset password",
+			ButtonText: i18n.T(lang, "mail.reset.button"),
 			LinkURL:    d.LinkURL,
-			Note:       "This link expires in 1 hour.",
+			Note:       i18n.T(lang, "mail.reset.expires"),
 			Footer:     footer,
 			AppURL:     strings.TrimSuffix(t.AppURL, "/"),
+			Lang:       lang,
+			CopyLink:   i18n.T(lang, "mail.copy_link"),
 		})
 	}
 

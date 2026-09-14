@@ -1,6 +1,6 @@
 {{define "layout"}}
 <!doctype html>
-<html lang="en">
+<html lang="{{.Lang}}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -31,6 +31,7 @@
       } catch(e) {}
     })();
   </script>
+  <script>window.__I18N__ = {{.ClientJSON}};</script>
   <style>
     :root { --tenant-accent: {{.AccentColor}}; }
   </style>
@@ -38,35 +39,24 @@
 </head>
 <body>
   <div class="auth-shell">
-    {{if and (ne .Title "Sign in") (ne .Title "Create account") (ne .Title "Reset password") (ne .Title "New password") (ne .Title "Verify email") (ne .Title "Security Center")}}
-    <a class="brand-link" href="https://sooauth.com">
-      {{if .LogoURL}}
-        <img class="brand-logo-img" src="{{.LogoURL}}" alt="{{.BrandName}}" />
-      {{else}}
-        <img class="brand-logo-img brand-logo-light" src="/auth/static/sooauth-light.png" alt="sooauth" />
-        <img class="brand-logo-img brand-logo-dark" src="/auth/static/sooauth-dark.png" alt="sooauth" />
-      {{end}}
-      <span class="brand-link-title">{{.BrandName}}</span>
-    </a>
-    {{end}}
     {{.Body}}
-    {{if ne .Title "Security Center"}}<footer class="auth-foot">
+    {{if not .HideFooter}}<footer class="auth-foot">
       <div class="foot-links">
-        <a href="/dashboard/">Dashboard</a>
+        <a href="/dashboard/">{{index .T "layout.dashboard"}}</a>
         <span aria-hidden="true">·</span>
-        <a href="https://sooauth.com/docs">Docs</a>
+        <a href="https://sooauth.com/docs">{{index .T "layout.docs"}}</a>
         <span aria-hidden="true">·</span>
-        <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt">AI prompt</a>
+        <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt">{{index .T "layout.ai_prompt"}}</a>
         <span aria-hidden="true">·</span>
-        <a href="https://sooapps.com" target="_blank" rel="noopener">A Sooapps product ↗</a>
+        <a href="https://sooapps.com" target="_blank" rel="noopener">{{index .T "layout.sooapps"}}</a>
       </div>
-      <button type="button" class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle dark/light theme" title="Toggle theme">
+      <button type="button" class="theme-toggle-btn" id="theme-toggle" aria-label="{{index .T "layout.theme_toggle"}}" title="{{index .T "layout.theme_toggle"}}">
         <svg class="theme-icon icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
         <svg class="theme-icon icon-moon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       </button>
     </footer>{{end}}
   </div>
-  <script src="/auth/static/app.js?v=9"></script>
+  <script src="/auth/static/app.js?v=10"></script>
 </body>
 </html>
 {{end}}

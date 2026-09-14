@@ -64,7 +64,7 @@ func TestSignUpVerifySignInResetFlow(t *testing.T) {
 	email := "m3-flow@sooauth.local"
 	_, _ = db.Exec(ctx, `DELETE FROM users WHERE email = $1`, email)
 
-	if err := svc.SignUp(ctx, email, "password-one-two", "127.0.0.1"); err != nil {
+	if err := svc.SignUp(ctx, email, "password-one-two", "127.0.0.1", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -113,7 +113,7 @@ func TestRefreshRotationAndReuseRevokesFamily(t *testing.T) {
 	email := "m4-refresh@sooauth.local"
 	_, _ = db.Exec(ctx, `DELETE FROM users WHERE email = $1`, email)
 
-	if err := svc.SignUp(ctx, email, "password-one-two", "127.0.0.1"); err != nil {
+	if err := svc.SignUp(ctx, email, "password-one-two", "127.0.0.1", ""); err != nil {
 		t.Fatal(err)
 	}
 	user, _, err := store.NewUsers(db).FindByEmail(ctx, email)
@@ -162,7 +162,7 @@ func TestJWKSValidatesAccessToken(t *testing.T) {
 	email := "m4-jwks@sooauth.local"
 	_, _ = db.Exec(ctx, `DELETE FROM users WHERE email = $1`, email)
 
-	if err := svc.SignUp(ctx, email, "password-one-two", "127.0.0.1"); err != nil {
+	if err := svc.SignUp(ctx, email, "password-one-two", "127.0.0.1", ""); err != nil {
 		t.Fatal(err)
 	}
 	user, _, err := store.NewUsers(db).FindByEmail(ctx, email)
@@ -203,7 +203,7 @@ func TestPasswordResetOptsAndCodeFlow(t *testing.T) {
 	email := "reset-code-test@sooauth.local"
 	_, _ = db.Exec(ctx, `DELETE FROM users WHERE email = $1`, email)
 
-	if err := svc.SignUp(ctx, email, "old-password-123", "127.0.0.1"); err != nil {
+	if err := svc.SignUp(ctx, email, "old-password-123", "127.0.0.1", ""); err != nil {
 		t.Fatal(err)
 	}
 	user, _, err := store.NewUsers(db).FindByEmail(ctx, email)
