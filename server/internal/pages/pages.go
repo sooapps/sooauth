@@ -34,6 +34,10 @@ type ViewData struct {
 	Message         string
 	AppURL          string
 	SignInURL       string
+	Lang            string
+	T               map[string]string
+	HideFooter      bool
+	ClientJSON      template.JS
 }
 
 func NewRenderer() (*Renderer, error) {

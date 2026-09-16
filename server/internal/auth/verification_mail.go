@@ -21,15 +21,17 @@ type AppVerificationEmailOpts struct {
 	Delivery  emailverify.Delivery
 	ClientID  string
 	ReturnTo  string
+	Lang      string
 }
 
 type verificationMailOpts struct {
 	BrandName string
-	User        *store.User
-	Delivery    emailverify.Delivery
-	ClientID    string
-	ReturnTo    string
-	AppScoped   bool
+	User      *store.User
+	Delivery  emailverify.Delivery
+	ClientID  string
+	ReturnTo  string
+	AppScoped bool
+	Lang      string
 }
 
 func (s *Service) sendVerificationMail(ctx context.Context, opts verificationMailOpts) error {
@@ -80,7 +82,7 @@ func (s *Service) sendVerificationMail(ctx context.Context, opts verificationMai
 		content.Code = code
 	}
 
-	tx := mail.Transactional{BrandName: opts.BrandName, AppURL: s.cfg.AppURL}
+	tx := mail.Transactional{BrandName: opts.BrandName, AppURL: s.cfg.AppURL, Lang: opts.Lang}
 	subject, plainBody, htmlBody := tx.VerificationDeliveryEmail(content, opts.AppScoped)
 	return mailer.SendOutbound(mail.Outbound{
 		To:      opts.User.Email,
@@ -90,12 +92,13 @@ func (s *Service) sendVerificationMail(ctx context.Context, opts verificationMai
 	})
 }
 
-func (s *Service) sendVerificationEmail(ctx context.Context, user *store.User) error {
+func (s *Service) sendVerificationEmail(ctx context.Context, user *store.User, lang string) error {
 	return s.sendVerificationMail(ctx, verificationMailOpts{
 		BrandName: s.cfg.BrandName,
 		User:      user,
 		Delivery:  emailverify.DeliveryLink,
 		AppScoped: false,
+		Lang:      lang,
 	})
 }
 
@@ -122,6 +125,7 @@ func (s *Service) ResendAppVerification(ctx context.Context, opts AppVerificatio
 		ClientID:  opts.ClientID,
 		ReturnTo:  opts.ReturnTo,
 		AppScoped: true,
+		Lang:      opts.Lang,
 	}); err != nil {
 		return fmt.Errorf("%w: %v", ErrEmailDelivery, err)
 	}
@@ -135,8 +139,9 @@ func (s *Service) SendAppVerificationEmail(ctx context.Context, opts AppVerifica
 		BrandName: opts.BrandName,
 		User:      opts.User,
 		Delivery:  opts.Delivery,
-		ClientID:    opts.ClientID,
-		ReturnTo:    opts.ReturnTo,
-		AppScoped:   true,
+		ClientID:  opts.ClientID,
+		ReturnTo:  opts.ReturnTo,
+		AppScoped: true,
+		Lang:      opts.Lang,
 	})
 }

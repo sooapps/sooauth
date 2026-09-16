@@ -13,6 +13,7 @@ import (
 	"github.com/sooapps/sooauth/server/internal/accounts"
 	"github.com/sooapps/sooauth/server/internal/auth"
 	"github.com/sooapps/sooauth/server/internal/emailverify"
+	"github.com/sooapps/sooauth/server/internal/i18n"
 	"github.com/sooapps/sooauth/server/internal/mfa"
 	"github.com/sooapps/sooauth/server/internal/passwordpolicy"
 	"github.com/sooapps/sooauth/server/internal/store"
@@ -43,10 +44,16 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var err error
+	lang := i18n.Resolve(r, "")
 	if strings.TrimSpace(body.ClientID) != "" {
-		err = s.signUpAppUser(r.Context(), body.ClientID, body.Email, body.Password, body.ReturnTo, clientIP(r))
+		if client, _ := s.oauthClients.FindByClientID(r.Context(), body.ClientID); client != nil && client.TenantID != nil {
+			if tenant, _ := s.tenants.FindByID(r.Context(), *client.TenantID); tenant != nil {
+				lang = i18n.Resolve(r, tenant.DefaultLocale)
+			}
+		}
+		err = s.signUpAppUser(r.Context(), body.ClientID, body.Email, body.Password, body.ReturnTo, clientIP(r), lang)
 	} else {
-		err = s.auth.SignUp(r.Context(), body.Email, body.Password, clientIP(r))
+		err = s.auth.SignUp(r.Context(), body.Email, body.Password, clientIP(r), lang)
 	}
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
@@ -146,7 +153,7 @@ func (s *Server) handleResendVerification(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err := s.auth.ResendVerification(r.Context(), body.Email, clientIP(r))
+	err := s.auth.ResendVerification(r.Context(), body.Email, clientIP(r), i18n.Resolve(r, ""))
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
 		return
@@ -443,6 +450,12 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		delivery = "link"
 	}
 
+	tenantDefault := ""
+	if tenantID != nil {
+		if tenant, _ := s.tenants.FindByID(r.Context(), *tenantID); tenant != nil {
+			tenantDefault = tenant.DefaultLocale
+		}
+	}
 	err := s.auth.ForgotPasswordWithOpts(r.Context(), auth.ForgotPasswordOpts{
 		Email:     body.Email,
 		IP:        clientIP(r),
@@ -452,6 +465,7 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		Delivery:  delivery,
 		BrandName: brandName,
 		AppScoped: appScoped,
+		Lang:      i18n.Resolve(r, tenantDefault),
 	})
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})

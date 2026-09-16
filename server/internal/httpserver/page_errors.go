@@ -1,28 +1,32 @@
 package httpserver
 
-import "strings"
+import (
+	"strings"
 
-func friendlyPageError(code string) string {
+	"github.com/sooapps/sooauth/server/internal/i18n"
+)
+
+func friendlyPageError(lang, code string) string {
 	switch code {
 	case "invalid_credentials":
-		return "Wrong email or password."
+		return i18n.T(lang, "error.invalid_credentials")
 	case "email_not_verified":
-		return "Check your inbox — verify your email before signing in."
+		return i18n.T(lang, "error.email_not_verified")
 	case "social_callback_failed", "social_failed":
-		return "Google sign-in didn't finish. Close this tab and use the Google button again."
+		return i18n.T(lang, "error.social_failed")
 	case "identity_already_linked":
-		return "That account is already connected to another platform account."
+		return i18n.T(lang, "error.identity_already_linked")
 	case "identity_link_failed":
-		return "The connected account could not be added. Try again."
+		return i18n.T(lang, "error.identity_link_failed")
 	case "app_account_dashboard":
-		return "That Google account is for your app users only. Sign in to the dashboard with your sooauth.com platform account (email + password), or use a private/incognito window to test app login."
+		return i18n.T(lang, "error.app_account_dashboard")
 	case "rate_limited":
-		return "Too many attempts. Wait a minute and try again."
+		return i18n.T(lang, "error.rate_limited")
 	case "invalid_token":
-		return "This link expired or was already used."
+		return i18n.T(lang, "error.invalid_token")
 	default:
 		if code != "" {
-			return "Something went wrong. Try again."
+			return i18n.T(lang, "error.generic")
 		}
 		return ""
 	}
@@ -36,8 +40,8 @@ func friendlyPageMessage(raw string) string {
 }
 
 func friendlyAPIError(code string) string {
-	if msg := friendlyPageError(code); msg != "" {
+	if msg := friendlyPageError(i18n.LangEN, code); msg != "" {
 		return msg
 	}
-	return "Something went wrong. Try again."
+	return i18n.T(i18n.LangEN, "error.generic")
 }

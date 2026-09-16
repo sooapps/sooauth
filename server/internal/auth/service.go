@@ -132,7 +132,7 @@ func (s *Service) resolveMailer(ctx context.Context, tenantID *uuid.UUID) mail.S
 	return s.mail
 }
 
-func (s *Service) SignUp(ctx context.Context, email, plainPassword, ip string) error {
+func (s *Service) SignUp(ctx context.Context, email, plainPassword, ip, lang string) error {
 	if ok, _ := s.limit.Allow(ctx, "signup_ip", ip, 5, time.Minute); !ok {
 		return ErrRateLimited
 	}
@@ -161,7 +161,7 @@ func (s *Service) SignUp(ctx context.Context, email, plainPassword, ip string) e
 		if err := s.users.UpdatePassword(ctx, existing.ID, plainPassword); err != nil {
 			return err
 		}
-		if err := s.sendVerificationEmail(ctx, existing); err != nil {
+		if err := s.sendVerificationEmail(ctx, existing, lang); err != nil {
 			return fmt.Errorf("%w: %v", ErrEmailDelivery, err)
 		}
 		uid := existing.ID
@@ -172,7 +172,7 @@ func (s *Service) SignUp(ctx context.Context, email, plainPassword, ip string) e
 		return err
 	}
 
-	if err := s.sendVerificationEmail(ctx, user); err != nil {
+	if err := s.sendVerificationEmail(ctx, user, lang); err != nil {
 		_ = s.users.DeleteUnverified(ctx, user.ID)
 		return fmt.Errorf("%w: %v", ErrEmailDelivery, err)
 	}
@@ -182,7 +182,7 @@ func (s *Service) SignUp(ctx context.Context, email, plainPassword, ip string) e
 	return nil
 }
 
-func (s *Service) ResendVerification(ctx context.Context, email, ip string) error {
+func (s *Service) ResendVerification(ctx context.Context, email, ip, lang string) error {
 	if ok, _ := s.limit.Allow(ctx, "verify_resend_ip", ip, 5, time.Minute); !ok {
 		return ErrRateLimited
 	}
@@ -198,7 +198,7 @@ func (s *Service) ResendVerification(ctx context.Context, email, ip string) erro
 		return nil
 	}
 
-	if err := s.sendVerificationEmail(ctx, user); err != nil {
+	if err := s.sendVerificationEmail(ctx, user, lang); err != nil {
 		return fmt.Errorf("%w: %v", ErrEmailDelivery, err)
 	}
 	uid := user.ID
@@ -545,6 +545,7 @@ type ForgotPasswordOpts struct {
 	Delivery  string
 	BrandName string
 	AppScoped bool
+	Lang      string
 }
 
 func (s *Service) ForgotPassword(ctx context.Context, email, ip string) error {
@@ -618,7 +619,7 @@ func (s *Service) ForgotPasswordWithOpts(ctx context.Context, opts ForgotPasswor
 		d.LinkURL = fmt.Sprintf("%s/auth/reset-password?%s", trimSlash(s.cfg.AppURL), q.Encode())
 	}
 
-	tx := mail.Transactional{BrandName: brand, AppURL: s.cfg.AppURL}
+	tx := mail.Transactional{BrandName: brand, AppURL: s.cfg.AppURL, Lang: opts.Lang}
 	subject, plainBody, htmlBody := tx.PasswordResetDeliveryEmail(d, opts.AppScoped)
 	mailer := s.resolveMailer(ctx, opts.TenantID)
 	_ = mailer.SendOutbound(mail.Outbound{
