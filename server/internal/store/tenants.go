@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -13,6 +14,56 @@ import (
 	"github.com/sooapps/sooauth/server/internal/emailverify"
 	"github.com/sooapps/sooauth/server/internal/passwordpolicy"
 )
+
+type AuthConfig struct {
+	AllowedIdentifiers []string `json:"allowed_identifiers"` // "email", "username", "phone"
+	PrimaryAuthMode    string   `json:"primary_auth_mode"`   // "password", "otp", "both"
+}
+
+func DefaultAuthConfig() AuthConfig {
+	return AuthConfig{
+		AllowedIdentifiers: []string{"email"},
+		PrimaryAuthMode:    "password",
+	}
+}
+
+func (c AuthConfig) Normalize() AuthConfig {
+	if len(c.AllowedIdentifiers) == 0 {
+		c.AllowedIdentifiers = []string{"email"}
+	}
+	validModes := map[string]bool{"password": true, "otp": true, "both": true}
+	if !validModes[c.PrimaryAuthMode] {
+		c.PrimaryAuthMode = "password"
+	}
+	return c
+}
+
+type SelectOption struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+type OptionsSource struct {
+	Type            string            `json:"type"` // "static" | "dynamic_api"
+	Options         []SelectOption    `json:"options,omitempty"`
+	URL             string            `json:"url,omitempty"`
+	Method          string            `json:"method,omitempty"`
+	Headers         map[string]string `json:"headers,omitempty"`
+	ItemsPath       string            `json:"items_path,omitempty"`
+	LabelKey        string            `json:"label_key,omitempty"`
+	ValueKey        string            `json:"value_key,omitempty"`
+	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitempty"`
+}
+
+type RegistrationField struct {
+	ID            string         `json:"id"`
+	Label         string         `json:"label"`
+	Type          string         `json:"type"` // "text" | "textarea" | "number" | "select" | "checkbox"
+	Required      bool           `json:"required"`
+	Placeholder   string         `json:"placeholder,omitempty"`
+	Description   string         `json:"description,omitempty"`
+	OptionsSource *OptionsSource `json:"options_source,omitempty"`
+}
 
 type Tenant struct {
 	ID                     uuid.UUID
@@ -27,6 +78,8 @@ type Tenant struct {
 	PasswordRequireSpecial bool
 	SocialCallbackOrigin   string
 	DefaultLocale          string
+	AuthConfig             AuthConfig
+	RegistrationSchema     []RegistrationField
 	CreatedAt              time.Time
 }
 
@@ -53,10 +106,14 @@ func NewTenants(db *pgxpool.Pool) *Tenants {
 
 const tenantSelectCols = `id, account_id, name, owner_user_id, email_verify_required, email_verify_delivery,
 		       password_min_length, password_require_uppercase, password_require_number, password_require_special,
-		       social_callback_origin, default_locale, created_at`
+		       social_callback_origin, default_locale, created_at,
+		       COALESCE(auth_config, '{"allowed_identifiers":["email"],"primary_auth_mode":"password"}'::jsonb),
+		       COALESCE(registration_schema, '[]'::jsonb)`
 
 func (t *Tenants) scanTenant(row pgx.Row) (*Tenant, error) {
 	var tenant Tenant
+	var authConfigJSON []byte
+	var regSchemaJSON []byte
 	if err := row.Scan(
 		&tenant.ID,
 		&tenant.AccountID,
@@ -71,6 +128,8 @@ func (t *Tenants) scanTenant(row pgx.Row) (*Tenant, error) {
 		&tenant.SocialCallbackOrigin,
 		&tenant.DefaultLocale,
 		&tenant.CreatedAt,
+		&authConfigJSON,
+		&regSchemaJSON,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -79,6 +138,17 @@ func (t *Tenants) scanTenant(row pgx.Row) (*Tenant, error) {
 	}
 	if tenant.DefaultLocale == "" {
 		tenant.DefaultLocale = "en"
+	}
+	tenant.AuthConfig = DefaultAuthConfig()
+	if len(authConfigJSON) > 0 {
+		_ = json.Unmarshal(authConfigJSON, &tenant.AuthConfig)
+	}
+	tenant.AuthConfig = tenant.AuthConfig.Normalize()
+	if len(regSchemaJSON) > 0 {
+		_ = json.Unmarshal(regSchemaJSON, &tenant.RegistrationSchema)
+	}
+	if tenant.RegistrationSchema == nil {
+		tenant.RegistrationSchema = []RegistrationField{}
 	}
 	return &tenant, nil
 }
@@ -104,6 +174,8 @@ func (t *Tenants) ListByAccount(ctx context.Context, accountID uuid.UUID) ([]Ten
 	var out []Tenant
 	for rows.Next() {
 		var tenant Tenant
+		var authConfigJSON []byte
+		var regSchemaJSON []byte
 		if err := rows.Scan(
 			&tenant.ID,
 			&tenant.AccountID,
@@ -118,11 +190,24 @@ func (t *Tenants) ListByAccount(ctx context.Context, accountID uuid.UUID) ([]Ten
 			&tenant.SocialCallbackOrigin,
 			&tenant.DefaultLocale,
 			&tenant.CreatedAt,
+			&authConfigJSON,
+			&regSchemaJSON,
 		); err != nil {
 			return nil, err
 		}
 		if tenant.DefaultLocale == "" {
 			tenant.DefaultLocale = "en"
+		}
+		tenant.AuthConfig = DefaultAuthConfig()
+		if len(authConfigJSON) > 0 {
+			_ = json.Unmarshal(authConfigJSON, &tenant.AuthConfig)
+		}
+		tenant.AuthConfig = tenant.AuthConfig.Normalize()
+		if len(regSchemaJSON) > 0 {
+			_ = json.Unmarshal(regSchemaJSON, &tenant.RegistrationSchema)
+		}
+		if tenant.RegistrationSchema == nil {
+			tenant.RegistrationSchema = []RegistrationField{}
 		}
 		out = append(out, tenant)
 	}
@@ -172,6 +257,8 @@ func (t *Tenants) Create(ctx context.Context, accountID, ownerID uuid.UUID, name
 		PasswordRequireNumber:  false,
 		PasswordRequireSpecial: false,
 		DefaultLocale:          "en",
+		AuthConfig:             DefaultAuthConfig(),
+		RegistrationSchema:     []RegistrationField{},
 		CreatedAt:              now,
 	}, nil
 }
@@ -202,6 +289,28 @@ func (t *Tenants) UpdateSettings(ctx context.Context, id uuid.UUID, name string,
 			default_locale = $9
 		WHERE id = $1
 	`, id, name, emailVerifyRequired, delivery.String(), policy.MinLength, policy.RequireUppercase, policy.RequireNumber, policy.RequireSpecial, defaultLocale)
+	return err
+}
+
+func (t *Tenants) UpdateAuthConfigAndRegistrationSchema(ctx context.Context, id uuid.UUID, authConfig AuthConfig, schema []RegistrationField) error {
+	authConfig = authConfig.Normalize()
+	authConfigJSON, err := json.Marshal(authConfig)
+	if err != nil {
+		return err
+	}
+	if schema == nil {
+		schema = []RegistrationField{}
+	}
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		return err
+	}
+	_, err = t.db.Exec(ctx, `
+		UPDATE tenants SET
+			auth_config = $2,
+			registration_schema = $3
+		WHERE id = $1
+	`, id, authConfigJSON, schemaJSON)
 	return err
 }
 

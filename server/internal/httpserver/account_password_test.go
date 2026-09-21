@@ -12,14 +12,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/sooapps/sooauth/server/internal/auth"
 	"github.com/sooapps/sooauth/server/internal/config"
 	appjwt "github.com/sooapps/sooauth/server/internal/crypto/jwt"
 	"github.com/sooapps/sooauth/server/internal/crypto/signing"
+	"github.com/sooapps/sooauth/server/internal/ephemeral"
+	"github.com/sooapps/sooauth/server/internal/fields"
 	"github.com/sooapps/sooauth/server/internal/mail"
 	"github.com/sooapps/sooauth/server/internal/migrate"
 	"github.com/sooapps/sooauth/server/internal/ratelimit"
 	"github.com/sooapps/sooauth/server/internal/store"
+	"github.com/sooapps/sooauth/server/internal/webhooks"
 )
 
 func TestUnauthenticatedPasswordEndpoints(t *testing.T) {
@@ -100,20 +104,36 @@ func setupTestServer(t *testing.T) (*Server, *pgxpool.Pool, *appjwt.Issuer) {
 	emailSettings := store.NewTenantEmailSettings(db, nil)
 	authSvc.SetEmailSettingsStore(emailSettings)
 
+	var rdb *redis.Client
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		opt, err := redis.ParseURL(redisURL)
+		if err == nil {
+			rdb = redis.NewClient(opt)
+		}
+	}
+	ephem := ephemeral.New(rdb)
+	webhookStore := store.NewWebhooks(db)
+	webhookDispatcher := webhooks.NewDispatcher(webhookStore)
+	dynamicOptions := fields.NewDynamicOptionsService()
+
 	s := &Server{
-		cfg:           cfg,
-		db:            db,
-		jwt:           jwtIssuer,
-		auth:          authSvc,
-		users:         users,
-		sessions:      sessions,
-		refresh:       refresh,
-		audit:         audit,
-		tenants:       store.NewTenants(db),
-		oauthClients:  store.NewOAuthClients(db),
-		theme:         store.NewThemeStore(db),
-		accounts:      store.NewAccounts(db),
-		emailSettings: emailSettings,
+		cfg:            cfg,
+		db:             db,
+		jwt:            jwtIssuer,
+		auth:           authSvc,
+		users:          users,
+		sessions:       sessions,
+		refresh:        refresh,
+		audit:          audit,
+		tenants:        store.NewTenants(db),
+		oauthClients:   store.NewOAuthClients(db),
+		theme:          store.NewThemeStore(db),
+		accounts:       store.NewAccounts(db),
+		emailSettings:  emailSettings,
+		ephemeral:      ephem,
+		webhooks:       webhookDispatcher,
+		webhookStore:   webhookStore,
+		dynamicOptions: dynamicOptions,
 	}
 
 	return s, db, jwtIssuer

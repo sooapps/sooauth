@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { getStoredLang, setStoredLang, t, type Lang, type TranslateFn } from "./i18n";
 import "./styles.css";
 
-type Tab = "overview" | "integration" | "providers" | "project" | "users" | "sessions" | "theme" | "email" | "billing" | "audit" | "webhooks";
+type Tab = "overview" | "integration" | "providers" | "project" | "forms" | "users" | "sessions" | "theme" | "email" | "billing" | "audit" | "webhooks";
 type Data = Record<string, any>;
 type AppTheme = "light" | "dark" | "system";
 
@@ -13,6 +13,7 @@ const tabMeta: { id: Tab; labelKey: string; groupKey: string }[] = [
   { id: "integration", labelKey: "nav.integration", groupKey: "nav.group.workspace" },
   { id: "providers", labelKey: "nav.providers", groupKey: "nav.group.workspace" },
   { id: "project", labelKey: "nav.project", groupKey: "nav.group.workspace" },
+  { id: "forms", labelKey: "nav.forms", groupKey: "nav.group.workspace" },
   { id: "users", labelKey: "nav.users", groupKey: "nav.group.workspace" },
   { id: "sessions", labelKey: "nav.sessions", groupKey: "nav.group.workspace" },
   { id: "theme", labelKey: "nav.theme", groupKey: "nav.group.configuration" },
@@ -666,9 +667,19 @@ function ResourcePage({ tab, notify }: { tab: Tab; notify: (message: string) => 
               <tbody>
                 {data.users.map((u: Data) => (
                   <tr key={u.id}>
-                    <td>{u.email}</td>
+                    <td>
+                      <div>
+                        <strong>{u.email || u.username || u.phone || tr("common.emDash")}</strong>
+                      </div>
+                      {(u.username || u.phone) && (u.email ? (
+                        <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>
+                          {u.username && <span style={{ marginRight: "6px" }}>@{u.username}</span>}
+                          {u.phone && <span>{u.phone}</span>}
+                        </div>
+                      ) : null)}
+                    </td>
                     <td>{u.signup_method || tr("common.emDash")}</td>
-                    <td>{u.email_verified ? tr("common.yes") : tr("common.no")}</td>
+                    <td>{u.email_verified || u.phone_verified_at ? tr("common.yes") : tr("common.no")}</td>
                     <td>{u.disabled ? tr("common.disabled") : tr("common.active")}</td>
                     <td>{u.created_at}</td>
                     <td>
@@ -906,6 +917,490 @@ function Settings({ tab, notify }: { tab: "project" | "theme" | "billing"; notif
         )}
       </div>
     </Card>
+  );
+}
+
+type SelectOption = { label: string; value: string };
+type OptionsSource = {
+  type: "static" | "dynamic_api";
+  options?: SelectOption[];
+  url?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  items_path?: string;
+  label_key?: string;
+  value_key?: string;
+  cache_ttl_seconds?: number;
+};
+type RegistrationField = {
+  id: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "select" | "checkbox";
+  required: boolean;
+  placeholder?: string;
+  description?: string;
+  options_source?: OptionsSource;
+};
+
+function FormsBuilder({ notify }: { notify: (message: string) => void }) {
+  const { tr } = useI18n();
+  const [data, setData] = useState<Data | null>(null);
+  const [allowedEmail, setAllowedEmail] = useState(true);
+  const [allowedUsername, setAllowedUsername] = useState(false);
+  const [allowedPhone, setAllowedPhone] = useState(false);
+  const [primaryAuthMode, setPrimaryAuthMode] = useState<"password" | "otp" | "both">("password");
+  const [fields, setFields] = useState<RegistrationField[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [testResult, setTestResult] = useState<Record<string, { loading?: boolean; count?: number; error?: string }>>({});
+
+  useEffect(() => {
+    request("/project")
+      .then((val) => {
+        setData(val);
+        const authCfg = val.auth_config || {};
+        const allowed = authCfg.allowed_identifiers || ["email"];
+        setAllowedEmail(allowed.includes("email"));
+        setAllowedUsername(allowed.includes("username"));
+        setAllowedPhone(allowed.includes("phone"));
+        setPrimaryAuthMode(authCfg.primary_auth_mode || "password");
+        setFields(val.registration_schema || []);
+      })
+      .catch((e) => notify(e.message));
+  }, []);
+
+  if (!data) return <Loading />;
+
+  const save = async () => {
+    const allowed = [];
+    if (allowedEmail) allowed.push("email");
+    if (allowedUsername) allowed.push("username");
+    if (allowedPhone) allowed.push("phone");
+    if (allowed.length === 0) {
+      notify("Please select at least one sign-in identifier.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await request("/project", {
+        method: "PUT",
+        body: JSON.stringify({
+          auth_config: {
+            allowed_identifiers: allowed,
+            primary_auth_mode: primaryAuthMode,
+          },
+          registration_schema: fields,
+        }),
+      });
+      notify(tr("common.settingsSaved"));
+    } catch (e) {
+      notify((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addField = () => {
+    const newId = "field_" + Date.now().toString(36);
+    setFields([
+      ...fields,
+      {
+        id: newId,
+        label: "New Field",
+        type: "text",
+        required: false,
+        placeholder: "",
+        description: "",
+      },
+    ]);
+  };
+
+  const removeField = (index: number) => {
+    setFields(fields.filter((_, i) => i !== index));
+  };
+
+  const updateField = (index: number, patch: Partial<RegistrationField>) => {
+    setFields(fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
+  };
+
+  const testApi = async (index: number, src: OptionsSource) => {
+    const field = fields[index];
+    setTestResult((prev) => ({ ...prev, [field.id]: { loading: true } }));
+    try {
+      const res = await request("/registration-schema/test-api", {
+        method: "POST",
+        body: JSON.stringify(src),
+      });
+      setTestResult((prev) => ({ ...prev, [field.id]: { count: res.count } }));
+    } catch (e) {
+      setTestResult((prev) => ({ ...prev, [field.id]: { error: (e as Error).message } }));
+    }
+  };
+
+  return (
+    <>
+      <Card title={tr("forms.identifiersTitle")} description={tr("forms.identifiersDesc")}>
+        <div style={{ display: "grid", gap: "16px", maxWidth: "600px" }}>
+          <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+            <label className="check" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <input
+                type="checkbox"
+                checked={allowedEmail}
+                onChange={(e) => setAllowedEmail(e.target.checked)}
+              />
+              <span>{tr("forms.idEmail")}</span>
+            </label>
+            <label className="check" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <input
+                type="checkbox"
+                checked={allowedUsername}
+                onChange={(e) => setAllowedUsername(e.target.checked)}
+              />
+              <span>{tr("forms.idUsername")}</span>
+            </label>
+            <label className="check" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <input
+                type="checkbox"
+                checked={allowedPhone}
+                onChange={(e) => setAllowedPhone(e.target.checked)}
+              />
+              <span>{tr("forms.idPhone")}</span>
+            </label>
+          </div>
+
+          <div style={{ marginTop: "12px" }}>
+            <span style={{ display: "block", fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>
+              {tr("forms.authModeTitle")}
+            </span>
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: "0 0 12px" }}>
+              {tr("forms.authModeDesc")}
+            </p>
+            <div style={{ display: "grid", gap: "10px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="auth_mode"
+                  value="password"
+                  checked={primaryAuthMode === "password"}
+                  onChange={() => setPrimaryAuthMode("password")}
+                />
+                <span>{tr("forms.modePassword")}</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="auth_mode"
+                  value="otp"
+                  checked={primaryAuthMode === "otp"}
+                  onChange={() => setPrimaryAuthMode("otp")}
+                />
+                <span>{tr("forms.modeOtp")}</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="auth_mode"
+                  value="both"
+                  checked={primaryAuthMode === "both"}
+                  onChange={() => setPrimaryAuthMode("both")}
+                />
+                <span>{tr("forms.modeBoth")}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card title={tr("forms.schemaTitle")} description={tr("forms.schemaDesc")}>
+        <div style={{ display: "grid", gap: "20px" }}>
+          {fields.length === 0 ? (
+            <div className="notice" style={{ padding: "16px", borderRadius: "8px" }}>
+              {tr("forms.noFields")}
+            </div>
+          ) : (
+            fields.map((field, idx) => {
+              const src = field.options_source || { type: "static", options: [] };
+              const tRes = testResult[field.id];
+
+              return (
+                <div
+                  key={field.id}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: "10px",
+                    padding: "16px",
+                    background: "var(--card-bg, rgba(255,255,255,0.02))",
+                    display: "grid",
+                    gap: "14px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <strong style={{ fontSize: "15px" }}>{field.label || field.id}</strong>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          background: "var(--accent-soft, #eee)",
+                          color: "var(--accent, #333)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {field.type.toUpperCase()}
+                      </span>
+                      {field.required && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            background: "rgba(255,59,59,0.1)",
+                            color: "#FF3B3B",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {tr("common.required")}
+                        </span>
+                      )}
+                    </div>
+                    <Button onClick={() => removeField(idx)}>{tr("forms.removeField")}</Button>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
+                    <Field
+                      label={tr("forms.fieldLabel")}
+                      value={field.label}
+                      onChange={(v) => updateField(idx, { label: v })}
+                    />
+                    <Field
+                      label={tr("forms.fieldId")}
+                      value={field.id}
+                      onChange={(v) => updateField(idx, { id: v.toLowerCase().replace(/[^a-z0-9_]/g, "_") })}
+                    />
+                    <label className="field">
+                      <span>{tr("forms.fieldType")}</span>
+                      <select
+                        value={field.type}
+                        onChange={(e) => {
+                          const nextType = e.target.value as RegistrationField["type"];
+                          const patch: Partial<RegistrationField> = { type: nextType };
+                          if (nextType === "select" && !field.options_source) {
+                            patch.options_source = { type: "static", options: [] };
+                          }
+                          updateField(idx, patch);
+                        }}
+                      >
+                        <option value="text">{tr("forms.typeText")}</option>
+                        <option value="textarea">{tr("forms.typeTextarea")}</option>
+                        <option value="number">{tr("forms.typeNumber")}</option>
+                        <option value="select">{tr("forms.typeSelect")}</option>
+                        <option value="checkbox">{tr("forms.typeCheckbox")}</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
+                    <Field
+                      label={tr("forms.fieldPlaceholder")}
+                      value={field.placeholder || ""}
+                      onChange={(v) => updateField(idx, { placeholder: v })}
+                    />
+                    <Field
+                      label={tr("forms.fieldDesc")}
+                      value={field.description || ""}
+                      onChange={(v) => updateField(idx, { description: v })}
+                    />
+                    <label className="check" style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "24px" }}>
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(e) => updateField(idx, { required: e.target.checked })}
+                      />
+                      <span>{tr("forms.fieldRequired")}</span>
+                    </label>
+                  </div>
+
+                  {field.type === "select" && (
+                    <div
+                      style={{
+                        marginTop: "8px",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        border: "1px dashed var(--border)",
+                        background: "rgba(0,0,0,0.02)",
+                      }}
+                    >
+                      <label className="field" style={{ marginBottom: "12px" }}>
+                        <span>{tr("forms.optionsSource")}</span>
+                        <select
+                          value={src.type || "static"}
+                          onChange={(e) => {
+                            const nextSrcType = e.target.value as "static" | "dynamic_api";
+                            updateField(idx, {
+                              options_source: {
+                                ...src,
+                                type: nextSrcType,
+                              },
+                            });
+                          }}
+                        >
+                          <option value="static">{tr("forms.sourceStatic")}</option>
+                          <option value="dynamic_api">{tr("forms.sourceDynamic")}</option>
+                        </select>
+                      </label>
+
+                      {src.type === "dynamic_api" ? (
+                        <div style={{ display: "grid", gap: "10px" }}>
+                          <Field
+                            label={tr("forms.apiUrl")}
+                            value={src.url || ""}
+                            placeholder="https://api.riotgames.com/lol/ranked/v4/entries/by-summoner/..."
+                            onChange={(v) =>
+                              updateField(idx, {
+                                options_source: { ...src, url: v },
+                              })
+                            }
+                          />
+                          <Field
+                            label={tr("forms.apiHeaders") + " (JSON)"}
+                            value={src.headers ? JSON.stringify(src.headers) : ""}
+                            placeholder='{"X-Riot-Token": "RGAPI-..."}'
+                            onChange={(v) => {
+                              try {
+                                const parsed = v.trim() ? JSON.parse(v) : {};
+                                updateField(idx, {
+                                  options_source: { ...src, headers: parsed },
+                                });
+                              } catch {
+                                /* ignore invalid json while typing */
+                              }
+                            }}
+                          />
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "10px" }}>
+                            <Field
+                              label={tr("forms.itemsPath")}
+                              value={src.items_path || ""}
+                              placeholder="data.ranks"
+                              onChange={(v) =>
+                                updateField(idx, {
+                                  options_source: { ...src, items_path: v },
+                                })
+                              }
+                            />
+                            <Field
+                              label={tr("forms.labelKey")}
+                              value={src.label_key || ""}
+                              placeholder="name or tier"
+                              onChange={(v) =>
+                                updateField(idx, {
+                                  options_source: { ...src, label_key: v },
+                                })
+                              }
+                            />
+                            <Field
+                              label={tr("forms.valueKey")}
+                              value={src.value_key || ""}
+                              placeholder="id or tier"
+                              onChange={(v) =>
+                                updateField(idx, {
+                                  options_source: { ...src, value_key: v },
+                                })
+                              }
+                            />
+                            <Field
+                              label={tr("forms.cacheTtl")}
+                              type="number"
+                              value={src.cache_ttl_seconds || 300}
+                              onChange={(v) =>
+                                updateField(idx, {
+                                  options_source: { ...src, cache_ttl_seconds: Number(v) || 300 },
+                                })
+                              }
+                            />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "6px" }}>
+                            <Button
+                              onClick={() => testApi(idx, src)}
+                              disabled={tRes?.loading || !src.url}
+                            >
+                              {tRes?.loading ? tr("forms.testingApi") : tr("forms.testApi")}
+                            </Button>
+                            {tRes?.count !== undefined && (
+                              <span style={{ color: "#2E7D32", fontSize: "13px", fontWeight: 600 }}>
+                                ✓ {tr("forms.testSuccess", { n: tRes.count })}
+                              </span>
+                            )}
+                            {tRes?.error && (
+                              <span style={{ color: "#D32F2F", fontSize: "13px" }}>
+                                ✗ {tr("forms.testFailed", { err: tRes.error })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "grid", gap: "8px" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 600 }}>{tr("forms.staticOptions")}</span>
+                          {(src.options || []).map((opt, optIdx) => (
+                            <div key={optIdx} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                              <input
+                                placeholder={tr("forms.optLabel")}
+                                value={opt.label}
+                                onChange={(e) => {
+                                  const nextOpts = [...(src.options || [])];
+                                  nextOpts[optIdx] = { ...opt, label: e.target.value };
+                                  updateField(idx, { options_source: { ...src, options: nextOpts } });
+                                }}
+                                style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid var(--border)" }}
+                              />
+                              <input
+                                placeholder={tr("forms.optValue")}
+                                value={opt.value}
+                                onChange={(e) => {
+                                  const nextOpts = [...(src.options || [])];
+                                  nextOpts[optIdx] = { ...opt, value: e.target.value };
+                                  updateField(idx, { options_source: { ...src, options: nextOpts } });
+                                }}
+                                style={{ flex: 1, padding: "8px", borderRadius: "6px", border: "1px solid var(--border)" }}
+                              />
+                              <Button
+                                onClick={() => {
+                                  const nextOpts = (src.options || []).filter((_, i) => i !== optIdx);
+                                  updateField(idx, { options_source: { ...src, options: nextOpts } });
+                                }}
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          ))}
+                          <div>
+                            <Button
+                              onClick={() => {
+                                const nextOpts = [...(src.options || []), { label: "", value: "" }];
+                                updateField(idx, { options_source: { ...src, options: nextOpts } });
+                              }}
+                            >
+                              {tr("forms.addOption")}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}>
+            <Button onClick={addField}>{tr("forms.addField")}</Button>
+            <Button primary onClick={save} disabled={saving}>
+              {saving ? tr("common.saving") : tr("common.saveChanges")}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </>
   );
 }
 
@@ -1195,6 +1690,7 @@ export function App() {
     : tab === "providers" ? <Providers notify={notify} />
     : tab === "overview" ? <Overview />
     : tab === "email" ? <EmailSettings notify={notify} />
+    : tab === "forms" ? <FormsBuilder notify={notify} />
     : ["users", "sessions", "audit", "webhooks"].includes(tab) ? <ResourcePage tab={tab} notify={notify} />
     : ["project", "theme", "billing"].includes(tab) ? <Settings tab={tab as "project" | "theme" | "billing"} notify={notify} />
     : null;

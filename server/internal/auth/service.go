@@ -243,6 +243,39 @@ func (s *Service) SignInAppWithOptions(ctx context.Context, tenantID uuid.UUID, 
 	return s.completeSignIn(ctx, found, ip, userAgent, "signin", opts.RememberMe)
 }
 
+func (s *Service) SignInAppByIdentifierWithOptions(ctx context.Context, tenantID uuid.UUID, identifier, plainPassword, ip, userAgent string, requireVerified bool, opts SignInOptions) (*TokenBundle, error) {
+	if ok, _ := s.limit.Allow(ctx, "signin_ip", ip, 20, time.Minute); !ok {
+		return nil, ErrRateLimited
+	}
+	if ok, _ := s.limit.Allow(ctx, "signin_identifier", identifier, 8, time.Minute); !ok {
+		return nil, ErrRateLimited
+	}
+
+	found, hash, err := s.users.FindAppUserByIdentifier(ctx, tenantID, identifier)
+	if err != nil || found == nil {
+		s.audit.Log(ctx, nil, "signin_failed", map[string]any{"identifier": identifier, "tenant_id": tenantID.String()}, ip)
+		s.emit(ctx, &tenantID, "user.login_failed", nil, map[string]any{"identifier": identifier, "ip": ip})
+		return nil, ErrInvalidCredentials
+	}
+
+	match, err := password.Verify(plainPassword, hash)
+	if err != nil || !match {
+		uid := found.ID
+		s.audit.Log(ctx, &uid, "signin_failed", map[string]any{"identifier": identifier, "tenant_id": tenantID.String()}, ip)
+		s.emit(ctx, &tenantID, "user.login_failed", found, map[string]any{"ip": ip})
+		return nil, ErrInvalidCredentials
+	}
+
+	if requireVerified && found.Email != "" && found.EmailVerifiedAt == nil {
+		return nil, ErrEmailNotVerified
+	}
+	if found.DisabledAt != nil {
+		return nil, ErrUserDisabled
+	}
+
+	return s.completeSignIn(ctx, found, ip, userAgent, "signin", opts.RememberMe)
+}
+
 func (s *Service) VerifyMFA(ctx context.Context, challenge, code, ip, userAgent string) (*TokenBundle, error) {
 	if s.mfa == nil {
 		return nil, ErrInvalidToken

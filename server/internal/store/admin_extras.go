@@ -14,7 +14,7 @@ func (s *Users) List(ctx context.Context, limit int) ([]User, error) {
 		limit = 50
 	}
 	rows, err := s.db.Query(ctx, `
-		SELECT id, email, email_verified_at, disabled_at, created_at
+		SELECT id, email, username, phone, email_verified_at, phone_verified_at, disabled_at, COALESCE(metadata, '{}'::jsonb), created_at
 		FROM users
 		ORDER BY created_at DESC
 		LIMIT $1
@@ -26,8 +26,17 @@ func (s *Users) List(ctx context.Context, limit int) ([]User, error) {
 	var out []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Email, &u.EmailVerifiedAt, &u.DisabledAt, &u.CreatedAt); err != nil {
+		var email *string
+		var metadataJSON []byte
+		if err := rows.Scan(&u.ID, &email, &u.Username, &u.Phone, &u.EmailVerifiedAt, &u.PhoneVerifiedAt, &u.DisabledAt, &metadataJSON, &u.CreatedAt); err != nil {
 			return nil, err
+		}
+		if email != nil {
+			u.Email = *email
+		}
+		u.Metadata = map[string]any{}
+		if len(metadataJSON) > 0 {
+			_ = json.Unmarshal(metadataJSON, &u.Metadata)
 		}
 		out = append(out, u)
 	}
@@ -39,7 +48,7 @@ func (s *Users) ListByTenant(ctx context.Context, tenantID uuid.UUID, limit int)
 		limit = 50
 	}
 	rows, err := s.db.Query(ctx, `
-		SELECT u.id, u.email, u.email_verified_at, u.disabled_at, u.created_at
+		SELECT u.id, u.email, u.username, u.phone, u.email_verified_at, u.phone_verified_at, u.disabled_at, COALESCE(u.metadata, '{}'::jsonb), u.created_at
 		FROM tenant_users tu
 		JOIN users u ON u.id = tu.user_id
 		WHERE tu.tenant_id = $1
@@ -53,8 +62,17 @@ func (s *Users) ListByTenant(ctx context.Context, tenantID uuid.UUID, limit int)
 	var out []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Email, &u.EmailVerifiedAt, &u.DisabledAt, &u.CreatedAt); err != nil {
+		var email *string
+		var metadataJSON []byte
+		if err := rows.Scan(&u.ID, &email, &u.Username, &u.Phone, &u.EmailVerifiedAt, &u.PhoneVerifiedAt, &u.DisabledAt, &metadataJSON, &u.CreatedAt); err != nil {
 			return nil, err
+		}
+		if email != nil {
+			u.Email = *email
+		}
+		u.Metadata = map[string]any{}
+		if len(metadataJSON) > 0 {
+			_ = json.Unmarshal(metadataJSON, &u.Metadata)
 		}
 		out = append(out, u)
 	}
@@ -76,8 +94,12 @@ func (s *Users) ListAppEndUsersByTenant(ctx context.Context, tenantID, ownerUser
 		SELECT
 			u.id,
 			u.email,
+			u.username,
+			u.phone,
 			u.email_verified_at,
+			u.phone_verified_at,
 			u.disabled_at,
+			COALESCE(u.metadata, '{}'::jsonb),
 			u.created_at,
 			EXISTS(
 				SELECT 1 FROM credentials c
@@ -105,17 +127,30 @@ func (s *Users) ListAppEndUsersByTenant(ctx context.Context, tenantID, ownerUser
 	var out []TenantUserAuth
 	for rows.Next() {
 		var row TenantUserAuth
+		var email *string
+		var metadataJSON []byte
 		if err := rows.Scan(
 			&row.ID,
-			&row.Email,
+			&email,
+			&row.Username,
+			&row.Phone,
 			&row.EmailVerifiedAt,
+			&row.PhoneVerifiedAt,
 			&row.DisabledAt,
+			&metadataJSON,
 			&row.CreatedAt,
 			&row.HasPassword,
 			&row.Providers,
 			&row.SignupMethod,
 		); err != nil {
 			return nil, err
+		}
+		if email != nil {
+			row.Email = *email
+		}
+		row.Metadata = map[string]any{}
+		if len(metadataJSON) > 0 {
+			_ = json.Unmarshal(metadataJSON, &row.Metadata)
 		}
 		out = append(out, row)
 	}

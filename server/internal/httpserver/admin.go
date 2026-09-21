@@ -265,6 +265,8 @@ func (s *Server) handleDashboardProject(w http.ResponseWriter, r *http.Request) 
 			"password_require_special": policy.RequireSpecial,
 			"password_hint":            policy.Describe(),
 			"default_locale":           store.NormalizeLocale(dash.tenant.DefaultLocale),
+			"auth_config":              dash.tenant.AuthConfig,
+			"registration_schema":      dash.tenant.RegistrationSchema,
 		})
 		return
 	}
@@ -275,14 +277,16 @@ func (s *Server) handleDashboardProject(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var body struct {
-		Name                   string `json:"name"`
-		EmailVerifyRequired    bool   `json:"email_verify_required"`
-		EmailVerifyDelivery    string `json:"email_verify_delivery"`
-		PasswordMinLength      int    `json:"password_min_length"`
-		PasswordRequireUpper   bool   `json:"password_require_upper"`
-		PasswordRequireNumber  bool   `json:"password_require_number"`
-		PasswordRequireSpecial bool   `json:"password_require_special"`
-		DefaultLocale          string `json:"default_locale"`
+		Name                   string                     `json:"name"`
+		EmailVerifyRequired    bool                       `json:"email_verify_required"`
+		EmailVerifyDelivery    string                     `json:"email_verify_delivery"`
+		PasswordMinLength      int                        `json:"password_min_length"`
+		PasswordRequireUpper   bool                       `json:"password_require_upper"`
+		PasswordRequireNumber  bool                       `json:"password_require_number"`
+		PasswordRequireSpecial bool                       `json:"password_require_special"`
+		DefaultLocale          string                     `json:"default_locale"`
+		AuthConfig             *store.AuthConfig          `json:"auth_config"`
+		RegistrationSchema     *[]store.RegistrationField `json:"registration_schema"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
@@ -306,7 +310,48 @@ func (s *Server) handleDashboardProject(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save_failed"})
 		return
 	}
+
+	if body.AuthConfig != nil || body.RegistrationSchema != nil {
+		authCfg := dash.tenant.AuthConfig
+		if body.AuthConfig != nil {
+			authCfg = *body.AuthConfig
+		}
+		schema := dash.tenant.RegistrationSchema
+		if body.RegistrationSchema != nil {
+			schema = *body.RegistrationSchema
+		}
+		if err := s.tenants.UpdateAuthConfigAndRegistrationSchema(r.Context(), dash.tenant.ID, authCfg, schema); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save_failed"})
+			return
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"message": "saved"})
+}
+
+func (s *Server) handleDashboardTestAPI(w http.ResponseWriter, r *http.Request) {
+	_, ok := s.requireDashboard(w, r)
+	if !ok {
+		return
+	}
+
+	var body store.OptionsSource
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+
+	body.Type = "dynamic_api"
+	options, err := s.dynamicOptions.FetchOptions(r.Context(), body)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "fetch_failed", "message": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"options": options,
+		"count":   len(options),
+	})
 }
 
 func (s *Server) handleDashboardIntegration(w http.ResponseWriter, r *http.Request) {
@@ -412,12 +457,16 @@ func (s *Server) handleDashboardUsers(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{
 			"id":             u.ID,
 			"email":          u.Email,
+			"username":       u.Username,
+			"phone":          u.Phone,
 			"email_verified": u.EmailVerifiedAt != nil,
+			"phone_verified": u.PhoneVerifiedAt != nil,
 			"disabled":       u.DisabledAt != nil,
 			"disabled_at":    u.DisabledAt,
 			"has_password":   u.HasPassword,
 			"providers":      u.Providers,
 			"signup_method":  signupMethodLabel(u.SignupMethod, u.HasPassword, u.Providers),
+			"metadata":       u.Metadata,
 			"created_at":     u.CreatedAt.Format(time.RFC3339),
 		})
 	}
