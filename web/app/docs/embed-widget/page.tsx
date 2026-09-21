@@ -170,6 +170,44 @@ export default function EmbedWidgetPage() {
         </p>
       </section>
 
+      <section className="mt-10 border border-line bg-bg-subtle p-6">
+        <h2 className="font-sans text-[18px] font-semibold text-fg">
+          Flexible Identifiers &amp; Passwordless OTP
+        </h2>
+        <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
+          <span className="font-mono text-[13px]">embed.js</span> automatically queries your project&apos;s authentication configuration from{" "}
+          <span className="font-mono text-[13px]">GET /v1/widget/config</span> and adapts its UI:
+        </p>
+        <ul className="mt-4 grid gap-2 text-[15px] text-fg-muted">
+          <li>
+            · <strong className="font-medium text-fg">Allowed Identifiers</strong> — If your project enables Email, Username, and/or Phone, the sign-in input displays a contextual label and placeholder (e.g. &quot;Email, username or phone&quot;). In sign-up mode, separate inputs are rendered for each enabled identifier.
+          </li>
+          <li>
+            · <strong className="font-medium text-fg">Passwordless OTP Mode</strong> — When primary auth mode is set to <span className="font-mono text-[13px]">otp</span>, the password field is replaced with a one-click &quot;Send verification code&quot; flow. Users enter their 6-digit code directly into the widget to complete sign-in without a password.
+          </li>
+        </ul>
+      </section>
+
+      <section className="mt-10 border border-line bg-bg-subtle p-6">
+        <h2 className="font-sans text-[18px] font-semibold text-fg">
+          Custom Registration Fields &amp; Dynamic API Options
+        </h2>
+        <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
+          Define custom registration fields in dashboard → <strong className="font-medium text-fg">Registration &amp; Fields</strong>. In sign-up mode, <span className="font-mono text-[13px]">embed.js</span> dynamically renders:
+        </p>
+        <ul className="mt-4 grid gap-2 text-[15px] text-fg-muted">
+          <li>
+            · <strong className="font-medium text-fg">Field Types</strong> — <span className="font-mono text-[13px]">text</span>, <span className="font-mono text-[13px]">textarea</span>, <span className="font-mono text-[13px]">number</span>, <span className="font-mono text-[13px]">select</span>, and <span className="font-mono text-[13px]">checkbox</span> with labels, descriptions, placeholders, and required validation.
+          </li>
+          <li>
+            · <strong className="font-medium text-fg">Dynamic External API Dropdowns</strong> — Dropdowns backed by external APIs (e.g. Riot Games League of Legends ranks) fetch options asynchronously via <span className="font-mono text-[13px]">/v1/widget/fields/&#123;field_id&#125;/options?client_id=...</span>. Your external API keys and secret headers remain strictly on your server and are never exposed in the browser.
+          </li>
+          <li>
+            · <strong className="font-medium text-fg">Metadata Storage</strong> — Custom field values are packaged into the user&apos;s <span className="font-mono text-[13px]">metadata</span> JSONB object upon sign-up and returned in OIDC <span className="font-mono text-[13px]">/oauth/userinfo</span> under <span className="font-mono text-[13px]">custom_claims</span>.
+          </li>
+        </ul>
+      </section>
+
       <section className="mt-10">
         <h2 className="font-sans text-[22px] font-semibold text-fg">
           After sign-in (JavaScript event)

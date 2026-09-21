@@ -55,6 +55,35 @@ export default function AdminDocsPage() {
           </p>
         </div>
         <div>
+          <h2 className="font-sans text-[20px] font-semibold text-fg">Registration &amp; Fields</h2>
+          <p className="mt-2 text-[15px] leading-[1.6] text-fg-muted">
+            Configure how end users sign up and sign in, including allowed identifiers, passwordless mode, and custom registration fields.
+          </p>
+          <ul className="mt-3 grid gap-2 text-[15px] leading-[1.6] text-fg-muted">
+            <li>
+              · <strong className="font-medium text-fg">Allowed Identifiers</strong> — Choose any combination of <span className="font-mono text-[13px]">Email</span>, <span className="font-mono text-[13px]">Username</span>, and <span className="font-mono text-[13px]">Phone</span>. You can allow username-only registration for gaming communities or phone-only for mobile apps.
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Primary Authentication Mode</strong> — Switch between <span className="font-mono text-[13px]">Password</span> (with customizable complexity rules) and <span className="font-mono text-[13px]">Passwordless OTP</span> (6-digit one-time code sent via email or SMS).
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Custom Form Builder</strong> — Define additional fields collected during registration: <span className="font-mono text-[13px]">text</span>, <span className="font-mono text-[13px]">textarea</span>, <span className="font-mono text-[13px]">number</span>, <span className="font-mono text-[13px]">select</span>, and <span className="font-mono text-[13px]">checkbox</span>. Each field supports custom labels, placeholders, descriptions, and required constraints.
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Dynamic External API Options</strong> — Connect dropdowns to any external REST API (e.g. Riot Games League of Legends ranks, country lists, department directories). Configure URL, request headers (e.g. API tokens), JSONPath extraction, and cache TTL.
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Interactive Test API</strong> — Test external API endpoints directly inside the dashboard with live latency metrics and a visual preview of extracted options before saving.
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Security Guarantee</strong> — External API secrets and tokens are securely stored on your server and proxied via <span className="font-mono text-[13px]">/v1/widget/fields/&#123;field_id&#125;/options</span>. Sensitive headers are never leaked to client browsers.
+            </li>
+            <li>
+              · <strong className="font-medium text-fg">Metadata &amp; OIDC Claims</strong> — All custom field inputs are saved in <span className="font-mono text-[13px]">users.metadata</span> and exposed in <span className="font-mono text-[13px]">/oauth/userinfo</span> under <span className="font-mono text-[13px]">custom_claims</span>, along with standard claims (<span className="font-mono text-[13px]">preferred_username</span>, <span className="font-mono text-[13px]">phone_number</span>, <span className="font-mono text-[13px]">phone_number_verified</span>).
+            </li>
+          </ul>
+        </div>
+        <div>
           <h2 className="font-sans text-[20px] font-semibold text-fg">App users</h2>
           <p className="mt-2 text-[15px] leading-[1.6] text-fg-muted">
              End users who sign in through your app — not Sooauth dashboard accounts. Each project has

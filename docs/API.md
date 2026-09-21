@@ -13,6 +13,26 @@ and widget APIs. The issuer is the public `APP_URL` of the deployment.
 | POST | `/oauth/token` | Exchange authorization code or refresh token |
 | GET | `/oauth/userinfo` | Read the authenticated user |
 
+### UserInfo Claims (`GET /oauth/userinfo`)
+
+Header: `Authorization: Bearer <access_token>`
+
+Returns standard OIDC claims plus custom registration metadata:
+```json
+{
+  "sub": "018f2d5e-...",
+  "email": "user@example.com",
+  "email_verified": true,
+  "preferred_username": "gamer_one",
+  "phone_number": "+905551234567",
+  "phone_number_verified": true,
+  "custom_claims": {
+    "lol_rank": "Gold IV",
+    "discord": "shadow#0001"
+  }
+}
+```
+
 Use an OIDC library whenever possible. Do not implement token validation or
 PKCE by hand.
 
@@ -20,8 +40,10 @@ PKCE by hand.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| POST | `/auth/sign-up` | Create a platform or app user |
-| POST | `/auth/sign-in` | Sign in with email and password |
+| POST | `/auth/sign-up` | Create a platform or app user (supports email, username, phone, and metadata) |
+| POST | `/auth/sign-in` | Sign in with email, username, or phone and password |
+| POST | `/auth/otp/send` | Send a 6-digit one-time verification code via email or SMS |
+| POST | `/auth/otp/verify` | Verify OTP code and sign in / register |
 | POST | `/auth/sign-out` | Revoke the current cookie session |
 | GET | `/auth/me` | Read the current account |
 | GET | `/auth/account/password` | Check whether current account has a password |
@@ -31,30 +53,107 @@ PKCE by hand.
 | POST | `/auth/reset-password` | Complete a password reset with token or code |
 | POST | `/auth/resend-verification` | Resend email verification |
 | POST | `/auth/verify-code` | Verify a six-digit app code |
+| GET | `/v1/widget/fields/{field_id}/options` | Dynamic select options proxy for embed widget |
+| POST | `/dashboard/api/registration-schema/test-api` | Live external API tester for registration fields |
 
 Mutating browser requests that use cookies require the `X-CSRF-Token` header.
 Public app endpoints use `client_id` to select a project. Never put provider
 secrets in an application; social provider credentials belong in the dashboard.
 
-### Sign In & Remember Me
+### Sign Up & Custom Metadata
+
+`POST /auth/sign-up`
+
+```json
+{
+  "email": "user@example.com",
+  "username": "gamer_one",
+  "phone": "+905551234567",
+  "password": "yourPassword123!",
+  "client_id": "app_your_client_id",
+  "metadata": {
+    "lol_rank": "Gold IV",
+    "discord": "shadow#0001"
+  }
+}
+```
+
+* `email` *(optional)*: User's email address (required if email is the sole allowed identifier).
+* `username` *(optional)*: User's unique handle within the tenant application.
+* `phone` *(optional)*: User's phone number in E.164 format.
+* `password` *(optional in OTP mode, required in password mode)*: User's chosen password.
+* `client_id` *(optional)*: Scopes registration to a specific tenant project.
+* `metadata` *(optional)*: Arbitrary JSON key-value pairs matching custom registration fields defined in the dashboard. Stored in `users.metadata` (JSONB) and accessible via OIDC `custom_claims`.
+
+### Sign In & Flexible Identifiers
 
 `POST /auth/sign-in`
 
 ```json
 {
-  "email": "user@example.com",
+  "identifier": "user@example.com",
   "password": "yourPassword123!",
   "client_id": "app_your_client_id",
   "remember_me": true
 }
 ```
 
-* `email` *(required)*: User's email address.
+* `identifier` *(required)*: User's login identifier — accepts **email address**, **username**, or **phone number** depending on project configuration. (`email` is also accepted for backward compatibility).
 * `password` *(required)*: User's password.
 * `client_id` *(optional)*: Scopes authentication to a specific tenant application.
 * `remember_me` *(optional, default: `true`)*:
   * When `true`: Sets persistent session and CSRF cookies (`Max-Age: 30 days`), and 30-day session and refresh tokens.
   * When `false`: Sets transient browser session cookies (omitting `Max-Age` / `Expires`, expiring on browser close), and 24-hour session and refresh tokens.
+
+### Passwordless OTP Authentication
+
+For projects with `primary_auth_mode: "otp"`, users can log in or register via one-time numeric verification codes.
+
+#### 1. Send OTP Code
+`POST /auth/otp/send`
+
+```json
+{
+  "client_id": "app_your_client_id",
+  "identifier": "+905551234567",
+  "channel": "sms"
+}
+```
+* `client_id` *(required)*: Tenant OAuth client ID.
+* `identifier` *(required)*: Email address or phone number to send the code to.
+* `channel` *(optional)*: `"sms"` or `"email"`.
+
+#### 2. Verify OTP Code
+`POST /auth/otp/verify`
+
+```json
+{
+  "client_id": "app_your_client_id",
+  "identifier": "+905551234567",
+  "code": "482019"
+}
+```
+
+On success, returns an authentication bundle (`access_token`, `expires_in`, `email` or user identity). If the user does not exist yet, an account is automatically created and marked verified.
+
+### Dynamic Field Options Proxy
+
+`GET /v1/widget/fields/{field_id}/options?client_id=app_your_client_id`
+
+Securely proxies external REST APIs (e.g. Riot Games League of Legends ranks) configured in the dashboard for select dropdowns.
+
+* API keys, tokens, and secret headers defined in the dashboard remain strictly on the server.
+* Responses are cached in memory according to the field's `cache_ttl_seconds` setting.
+* Returns:
+  ```json
+  {
+    "options": [
+      { "label": "Iron IV", "value": "iron_4" },
+      { "label": "Bronze III", "value": "bronze_3" },
+      { "label": "Gold I", "value": "gold_1" }
+    ]
+  }
+  ```
 
 
 ## Password Reset (Forgot Password)
