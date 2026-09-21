@@ -78,9 +78,13 @@ type Discovery struct {
 }
 
 type UserInfo struct {
-	Sub           string `json:"sub"`
-	Email         string `json:"email,omitempty"`
-	EmailVerified bool   `json:"email_verified"`
+	Sub                 string         `json:"sub"`
+	Email               string         `json:"email,omitempty"`
+	EmailVerified       bool           `json:"email_verified"`
+	PreferredUsername   string         `json:"preferred_username,omitempty"`
+	PhoneNumber         string         `json:"phone_number,omitempty"`
+	PhoneNumberVerified bool           `json:"phone_number_verified,omitempty"`
+	CustomClaims        map[string]any `json:"custom_claims,omitempty"`
 }
 
 type Service struct {
@@ -275,11 +279,20 @@ func (s *Service) UserInfo(ctx context.Context, accessToken string) (*UserInfo, 
 	if err != nil || user == nil {
 		return nil, auth.ErrInvalidToken
 	}
-	return &UserInfo{
+	info := &UserInfo{
 		Sub:           user.ID.String(),
 		Email:         user.Email,
 		EmailVerified: user.EmailVerifiedAt != nil,
-	}, nil
+		CustomClaims:  user.Metadata,
+	}
+	if user.Username != nil {
+		info.PreferredUsername = *user.Username
+	}
+	if user.Phone != nil {
+		info.PhoneNumber = *user.Phone
+		info.PhoneNumberVerified = user.PhoneVerifiedAt != nil
+	}
+	return info, nil
 }
 
 func (s *Service) validateClient(ctx context.Context, clientID, clientSecret string) (*store.OAuthClient, error) {

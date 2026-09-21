@@ -33,10 +33,13 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-		ClientID string `json:"client_id"`
-		ReturnTo string `json:"return_to"`
+		Email    string         `json:"email"`
+		Username string         `json:"username"`
+		Phone    string         `json:"phone"`
+		Password string         `json:"password"`
+		Metadata map[string]any `json:"metadata"`
+		ClientID string         `json:"client_id"`
+		ReturnTo string         `json:"return_to"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
@@ -51,7 +54,17 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 				lang = i18n.Resolve(r, tenant.DefaultLocale)
 			}
 		}
-		err = s.signUpAppUser(r.Context(), body.ClientID, body.Email, body.Password, body.ReturnTo, clientIP(r), lang)
+		err = s.signUpAppUser(r.Context(), AppSignUpInput{
+			ClientID: body.ClientID,
+			Email:    body.Email,
+			Username: body.Username,
+			Phone:    body.Phone,
+			Password: body.Password,
+			Metadata: body.Metadata,
+			ReturnTo: body.ReturnTo,
+			IP:       clientIP(r),
+			Lang:     lang,
+		})
 	} else {
 		err = s.auth.SignUp(r.Context(), body.Email, body.Password, clientIP(r), lang)
 	}
@@ -73,6 +86,28 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if errors.Is(err, store.ErrUsernameTaken) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "username_already_registered",
+			"message": "This username is already taken. Choose another.",
+		})
+		return
+	}
+	if errors.Is(err, store.ErrPhoneTaken) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "phone_already_registered",
+			"message": "This phone number is already registered. Sign in instead.",
+		})
+		return
+	}
+	if err != nil && strings.HasPrefix(err.Error(), "field_required:") {
+		fieldName := strings.TrimPrefix(err.Error(), "field_required:")
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "field_required",
+			"message": fieldName + " is required.",
+		})
+		return
+	}
 	if errors.Is(err, passwordpolicy.ErrWeak) {
 		msg := "Password does not meet this project's requirements."
 		if cid := strings.TrimSpace(body.ClientID); cid != "" {
@@ -89,7 +124,7 @@ func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "signup_failed"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "signup_failed", "message": err.Error()})
 		return
 	}
 
@@ -182,6 +217,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
+		Identifier string `json:"identifier"`
 		Email      string `json:"email"`
 		Password   string `json:"password"`
 		ClientID   string `json:"client_id"`
@@ -192,6 +228,11 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	identifier := strings.TrimSpace(body.Identifier)
+	if identifier == "" {
+		identifier = strings.TrimSpace(body.Email)
+	}
+
 	rememberMe := true
 	if body.RememberMe != nil {
 		rememberMe = *body.RememberMe
@@ -200,9 +241,9 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	var bundle *auth.TokenBundle
 	var err error
 	if strings.TrimSpace(body.ClientID) != "" {
-		bundle, err = s.signInAppUser(r.Context(), body.ClientID, body.Email, body.Password, clientIP(r), r.UserAgent(), rememberMe)
+		bundle, err = s.signInAppUser(r.Context(), body.ClientID, identifier, body.Password, clientIP(r), r.UserAgent(), rememberMe)
 	} else {
-		bundle, err = s.auth.SignInWithOptions(r.Context(), body.Email, body.Password, clientIP(r), r.UserAgent(), auth.SignInOptions{RememberMe: rememberMe})
+		bundle, err = s.auth.SignInWithOptions(r.Context(), identifier, body.Password, clientIP(r), r.UserAgent(), auth.SignInOptions{RememberMe: rememberMe})
 	}
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})

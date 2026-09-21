@@ -18,6 +18,7 @@ import (
 	appjwt "github.com/sooapps/sooauth/server/internal/crypto/jwt"
 	"github.com/sooapps/sooauth/server/internal/crypto/signing"
 	"github.com/sooapps/sooauth/server/internal/ephemeral"
+	"github.com/sooapps/sooauth/server/internal/fields"
 	"github.com/sooapps/sooauth/server/internal/health"
 	"github.com/sooapps/sooauth/server/internal/mail"
 	"github.com/sooapps/sooauth/server/internal/mfa"
@@ -58,6 +59,7 @@ type Server struct {
 	webhookStore   *store.Webhooks
 	identities     *store.SocialIdentities
 	emailSettings  *store.TenantEmailSettingsStore
+	dynamicOptions *fields.DynamicOptionsService
 }
 
 func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server, error) {
@@ -178,10 +180,11 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 				billingproviders.NewStripe(),
 			},
 		),
-		webhooks:      webhookDispatcher,
-		webhookStore:  webhookStore,
-		identities:    store.NewSocialIdentities(db),
-		emailSettings: emailSettings,
+		webhooks:       webhookDispatcher,
+		webhookStore:   webhookStore,
+		identities:     store.NewSocialIdentities(db),
+		emailSettings:  emailSettings,
+		dynamicOptions: fields.NewDynamicOptionsService(),
 	}
 
 	return s, nil
@@ -201,6 +204,8 @@ func (s *Server) Router() http.Handler {
 
 	mux.HandleFunc("GET /v1/widget/config", s.handleWidgetConfig)
 	mux.HandleFunc("OPTIONS /v1/widget/config", s.handlePublicCORS)
+	mux.HandleFunc("GET /v1/widget/fields/{field_id}/options", s.handleWidgetFieldOptions)
+	mux.HandleFunc("OPTIONS /v1/widget/fields/{field_id}/options", s.handlePublicCORS)
 	mux.HandleFunc("POST /v1/widget/exchange", s.handleWidgetExchange)
 	mux.HandleFunc("OPTIONS /v1/widget/exchange", s.handlePublicCORS)
 	mux.HandleFunc("GET /v1/widget/embed.js", s.handleWidgetEmbedJS)
@@ -208,6 +213,10 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("OPTIONS /auth/sign-up", s.handlePublicCORS)
 	mux.HandleFunc("POST /auth/sign-in", s.handleSignIn)
 	mux.HandleFunc("OPTIONS /auth/sign-in", s.handlePublicCORS)
+	mux.HandleFunc("POST /auth/otp/send", s.handleSendOTP)
+	mux.HandleFunc("OPTIONS /auth/otp/send", s.handlePublicCORS)
+	mux.HandleFunc("POST /auth/otp/verify", s.handleVerifyOTP)
+	mux.HandleFunc("OPTIONS /auth/otp/verify", s.handlePublicCORS)
 	mux.HandleFunc("POST /auth/mfa/start", s.handleMFAStart)
 	mux.HandleFunc("POST /auth/mfa/confirm", s.handleMFAConfirm)
 	mux.HandleFunc("POST /auth/mfa/disable", s.handleMFADisable)
@@ -267,6 +276,7 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /dashboard/api/projects/{id}/select", s.handleDashboardSelectProject)
 	mux.HandleFunc("GET /dashboard/api/project", s.handleDashboardProject)
 	mux.HandleFunc("PUT /dashboard/api/project", s.handleDashboardProject)
+	mux.HandleFunc("POST /dashboard/api/registration-schema/test-api", s.handleDashboardTestAPI)
 	mux.HandleFunc("GET /dashboard/api/integration", s.handleDashboardIntegration)
 	mux.HandleFunc("PUT /dashboard/api/integration", s.handleDashboardIntegration)
 	mux.HandleFunc("GET /dashboard/api/users", s.handleDashboardUsers)

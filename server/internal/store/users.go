@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -14,14 +15,36 @@ import (
 	"github.com/sooapps/sooauth/server/internal/crypto/password"
 )
 
-var ErrEmailTaken = errors.New("email already registered")
+var (
+	ErrEmailTaken    = errors.New("email already registered")
+	ErrUsernameTaken = errors.New("username already registered")
+	ErrPhoneTaken    = errors.New("phone number already registered")
+)
+
+func parseUniqueViolation(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if strings.Contains(pgErr.ConstraintName, "username") {
+			return ErrUsernameTaken
+		}
+		if strings.Contains(pgErr.ConstraintName, "phone") {
+			return ErrPhoneTaken
+		}
+		return ErrEmailTaken
+	}
+	return err
+}
 
 type User struct {
 	ID              uuid.UUID
 	TenantID        *uuid.UUID
 	Email           string
+	Username        *string
+	Phone           *string
 	EmailVerifiedAt *time.Time
+	PhoneVerifiedAt *time.Time
 	DisabledAt      *time.Time
+	Metadata        map[string]any
 	CreatedAt       time.Time
 }
 
@@ -38,10 +61,114 @@ func (s *Users) CreatePlatformUser(ctx context.Context, email, plainPassword str
 }
 
 func (s *Users) CreateAppUser(ctx context.Context, tenantID uuid.UUID, email, plainPassword string) (*User, error) {
+	return s.CreateAppUserFlexible(ctx, tenantID, email, "", "", plainPassword, nil)
+}
+
+func (s *Users) CreateAppUserFlexible(ctx context.Context, tenantID uuid.UUID, email, username, phone, plainPassword string, metadata map[string]any) (*User, error) {
 	if tenantID == uuid.Nil {
 		return nil, errors.New("tenant required")
 	}
-	return s.createWithPassword(ctx, &tenantID, email, plainPassword, false)
+
+	email = strings.ToLower(strings.TrimSpace(email))
+	username = strings.ToLower(strings.TrimSpace(username))
+	phone = strings.TrimSpace(phone)
+
+	if email == "" && username == "" && phone == "" {
+		return nil, errors.New("at least one identifier (email, username, or phone) is required")
+	}
+
+	var emailPtr, usernamePtr, phonePtr *string
+	if email != "" {
+		emailPtr = &email
+	}
+	if username != "" {
+		usernamePtr = &username
+	}
+	if phone != "" {
+		phonePtr = &phone
+	}
+
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	metaJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	var hash string
+	if strings.TrimSpace(plainPassword) != "" {
+		h, err := password.Hash(plainPassword)
+		if err != nil {
+			return nil, err
+		}
+		hash = h
+	}
+
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	userID := uuid.New()
+	now := time.Now().UTC()
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO users (id, tenant_id, email, username, phone, metadata, platform_owner, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7, $7)
+	`, userID, tenantID, emailPtr, usernamePtr, phonePtr, metaJSON, now)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, parseUniqueViolation(err)
+		}
+		return nil, err
+	}
+
+	if hash != "" {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO credentials (id, user_id, type, password_hash, created_at)
+			VALUES ($1, $2, 'password', $3, $4)
+		`, uuid.New(), userID, hash, now)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	method := "email"
+	if email == "" {
+		if username != "" {
+			method = "username"
+		} else if phone != "" {
+			method = "phone"
+		}
+	}
+	if hash == "" {
+		method = "otp"
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO tenant_users (tenant_id, user_id, signup_method)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (tenant_id, user_id) DO NOTHING
+	`, tenantID, userID, method)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return &User{
+		ID:        userID,
+		TenantID:  &tenantID,
+		Email:     email,
+		Username:  usernamePtr,
+		Phone:     phonePtr,
+		Metadata:  metadata,
+		CreatedAt: now,
+	}, nil
 }
 
 func (s *Users) CreateWithPassword(ctx context.Context, email, plainPassword string, platformOwner bool) (*User, error) {
@@ -109,6 +236,7 @@ func (s *Users) createWithPassword(ctx context.Context, tenantID *uuid.UUID, ema
 		ID:        userID,
 		TenantID:  tenantID,
 		Email:     email,
+		Metadata:  map[string]any{},
 		CreatedAt: now,
 	}, nil
 }
@@ -116,10 +244,10 @@ func (s *Users) createWithPassword(ctx context.Context, tenantID *uuid.UUID, ema
 func (s *Users) FindPlatformByEmail(ctx context.Context, email string) (*User, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	row := s.db.QueryRow(ctx, `
-		SELECT u.id, u.tenant_id, u.email, u.email_verified_at, u.disabled_at, u.created_at, c.password_hash
+		SELECT u.id, u.tenant_id, u.email, u.username, u.phone, u.email_verified_at, u.phone_verified_at, u.disabled_at, COALESCE(u.metadata, '{}'::jsonb), u.created_at, c.password_hash
 		FROM users u
 		JOIN credentials c ON c.user_id = u.id AND c.type = 'password'
-		WHERE u.email = $1 AND u.platform_owner = TRUE
+		WHERE lower(COALESCE(u.email, '')) = $1 AND u.platform_owner = TRUE
 	`, email)
 
 	return scanUserWithHash(row)
@@ -128,13 +256,60 @@ func (s *Users) FindPlatformByEmail(ctx context.Context, email string) (*User, s
 func (s *Users) FindByEmailInTenant(ctx context.Context, tenantID uuid.UUID, email string) (*User, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	row := s.db.QueryRow(ctx, `
-		SELECT u.id, u.tenant_id, u.email, u.email_verified_at, u.disabled_at, u.created_at, c.password_hash
+		SELECT u.id, u.tenant_id, u.email, u.username, u.phone, u.email_verified_at, u.phone_verified_at, u.disabled_at, COALESCE(u.metadata, '{}'::jsonb), u.created_at, c.password_hash
 		FROM users u
 		JOIN credentials c ON c.user_id = u.id AND c.type = 'password'
-		WHERE u.tenant_id = $1 AND u.email = $2 AND NOT u.platform_owner
+		WHERE u.tenant_id = $1 AND lower(COALESCE(u.email, '')) = $2 AND NOT u.platform_owner
 	`, tenantID, email)
 
 	return scanUserWithHash(row)
+}
+
+func (s *Users) FindAppUserByIdentifier(ctx context.Context, tenantID uuid.UUID, identifier string) (*User, string, error) {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return nil, "", errors.New("identifier required")
+	}
+	row := s.db.QueryRow(ctx, `
+		SELECT u.id, u.tenant_id, u.email, u.username, u.phone, u.email_verified_at, u.phone_verified_at, u.disabled_at, COALESCE(u.metadata, '{}'::jsonb), u.created_at, COALESCE(c.password_hash, '')
+		FROM users u
+		LEFT JOIN credentials c ON c.user_id = u.id AND c.type = 'password'
+		WHERE u.tenant_id = $1 AND (
+			lower(COALESCE(u.email, '')) = lower($2) OR
+			lower(COALESCE(u.username, '')) = lower($2) OR
+			COALESCE(u.phone, '') = $2
+		) AND NOT u.platform_owner
+		LIMIT 1
+	`, tenantID, identifier)
+
+	return scanUserWithHash(row)
+}
+
+func (s *Users) FindAppUserByIdentifierSimple(ctx context.Context, tenantID uuid.UUID, identifier string) (*User, error) {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return nil, errors.New("identifier required")
+	}
+	row := s.db.QueryRow(ctx, `
+		SELECT u.id, u.tenant_id, u.email, u.username, u.phone, u.email_verified_at, u.phone_verified_at, u.disabled_at, COALESCE(u.metadata, '{}'::jsonb), u.created_at
+		FROM users u
+		WHERE u.tenant_id = $1 AND (
+			lower(COALESCE(u.email, '')) = lower($2) OR
+			lower(COALESCE(u.username, '')) = lower($2) OR
+			COALESCE(u.phone, '') = $2
+		) AND NOT u.platform_owner
+		LIMIT 1
+	`, tenantID, identifier)
+
+	return scanUser(row)
+}
+
+func (s *Users) FindAppUserByPhone(ctx context.Context, tenantID uuid.UUID, phone string) (*User, error) {
+	return s.FindAppUserByIdentifierSimple(ctx, tenantID, phone)
+}
+
+func (s *Users) FindAppUserByUsername(ctx context.Context, tenantID uuid.UUID, username string) (*User, error) {
+	return s.FindAppUserByIdentifierSimple(ctx, tenantID, username)
 }
 
 func (s *Users) FindByEmail(ctx context.Context, email string) (*User, string, error) {
@@ -144,9 +319,9 @@ func (s *Users) FindByEmail(ctx context.Context, email string) (*User, string, e
 func (s *Users) FindByEmailSimpleInTenant(ctx context.Context, tenantID uuid.UUID, email string) (*User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	row := s.db.QueryRow(ctx, `
-		SELECT id, tenant_id, email, email_verified_at, disabled_at, created_at
+		SELECT id, tenant_id, email, username, phone, email_verified_at, phone_verified_at, disabled_at, COALESCE(metadata, '{}'::jsonb), created_at
 		FROM users
-		WHERE tenant_id = $1 AND email = $2 AND NOT platform_owner
+		WHERE tenant_id = $1 AND lower(COALESCE(email, '')) = $2 AND NOT platform_owner
 	`, tenantID, email)
 	return scanUser(row)
 }
@@ -154,9 +329,9 @@ func (s *Users) FindByEmailSimpleInTenant(ctx context.Context, tenantID uuid.UUI
 func (s *Users) FindPlatformByEmailSimple(ctx context.Context, email string) (*User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	row := s.db.QueryRow(ctx, `
-		SELECT id, tenant_id, email, email_verified_at, disabled_at, created_at
+		SELECT id, tenant_id, email, username, phone, email_verified_at, phone_verified_at, disabled_at, COALESCE(metadata, '{}'::jsonb), created_at
 		FROM users
-		WHERE email = $1 AND platform_owner = TRUE
+		WHERE lower(COALESCE(email, '')) = $1 AND platform_owner = TRUE
 	`, email)
 	return scanUser(row)
 }
@@ -167,30 +342,48 @@ func (s *Users) FindByEmailSimple(ctx context.Context, email string) (*User, err
 
 func scanUserWithHash(row pgx.Row) (*User, string, error) {
 	var user User
+	var email *string
+	var metadataJSON []byte
 	var hash string
-	if err := row.Scan(&user.ID, &user.TenantID, &user.Email, &user.EmailVerifiedAt, &user.DisabledAt, &user.CreatedAt, &hash); err != nil {
+	if err := row.Scan(&user.ID, &user.TenantID, &email, &user.Username, &user.Phone, &user.EmailVerifiedAt, &user.PhoneVerifiedAt, &user.DisabledAt, &metadataJSON, &user.CreatedAt, &hash); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, "", nil
 		}
 		return nil, "", err
+	}
+	if email != nil {
+		user.Email = *email
+	}
+	user.Metadata = map[string]any{}
+	if len(metadataJSON) > 0 {
+		_ = json.Unmarshal(metadataJSON, &user.Metadata)
 	}
 	return &user, hash, nil
 }
 
 func scanUser(row pgx.Row) (*User, error) {
 	var user User
-	if err := row.Scan(&user.ID, &user.TenantID, &user.Email, &user.EmailVerifiedAt, &user.DisabledAt, &user.CreatedAt); err != nil {
+	var email *string
+	var metadataJSON []byte
+	if err := row.Scan(&user.ID, &user.TenantID, &email, &user.Username, &user.Phone, &user.EmailVerifiedAt, &user.PhoneVerifiedAt, &user.DisabledAt, &metadataJSON, &user.CreatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	if email != nil {
+		user.Email = *email
+	}
+	user.Metadata = map[string]any{}
+	if len(metadataJSON) > 0 {
+		_ = json.Unmarshal(metadataJSON, &user.Metadata)
 	}
 	return &user, nil
 }
 
 func (s *Users) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	row := s.db.QueryRow(ctx, `
-		SELECT id, tenant_id, email, email_verified_at, disabled_at, created_at FROM users WHERE id = $1
+		SELECT id, tenant_id, email, username, phone, email_verified_at, phone_verified_at, disabled_at, COALESCE(metadata, '{}'::jsonb), created_at FROM users WHERE id = $1
 	`, id)
 	return scanUser(row)
 }
@@ -200,6 +393,29 @@ func (s *Users) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
 		UPDATE users SET email_verified_at = now(), updated_at = now()
 		WHERE id = $1 AND email_verified_at IS NULL
 	`, userID)
+	return err
+}
+
+func (s *Users) MarkPhoneVerified(ctx context.Context, userID uuid.UUID) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE users SET phone_verified_at = now(), updated_at = now()
+		WHERE id = $1 AND phone_verified_at IS NULL
+	`, userID)
+	return err
+}
+
+func (s *Users) UpdateUserMetadata(ctx context.Context, userID uuid.UUID, metadata map[string]any) error {
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	metaJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(ctx, `
+		UPDATE users SET metadata = $2, updated_at = now()
+		WHERE id = $1
+	`, userID, metaJSON)
 	return err
 }
 
