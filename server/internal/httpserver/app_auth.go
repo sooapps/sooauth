@@ -392,6 +392,11 @@ func (s *Server) handleWidgetFieldOptions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if s.dynamicOptions == nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "dynamic_options_not_configured"})
+		return
+	}
+
 	options, err := s.dynamicOptions.FetchOptions(r.Context(), *targetField.OptionsSource)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "failed_to_fetch_options", "message": err.Error()})
@@ -442,6 +447,10 @@ func (s *Server) handleSendOTP(w http.ResponseWriter, r *http.Request) {
 	code := fmt.Sprintf("%06d", (time.Now().UnixNano()%900000)+100000)
 
 	cacheKey := fmt.Sprintf("otp:%s:%s", tenantID.String(), identifier)
+	if s.ephemeral == nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ephemeral_store_not_configured"})
+		return
+	}
 	if err := s.ephemeral.Set(r.Context(), cacheKey, otpPayload{
 		Code:       code,
 		Identifier: identifier,
@@ -451,11 +460,13 @@ func (s *Server) handleSendOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.webhooks.Emit(r.Context(), &tenantID, "otp.sent", nil, map[string]any{
-		"identifier": identifier,
-		"channel":    body.Channel,
-		"ip":         clientIP(r),
-	})
+	if s.webhooks != nil {
+		s.webhooks.Emit(r.Context(), &tenantID, "otp.sent", nil, map[string]any{
+			"identifier": identifier,
+			"channel":    body.Channel,
+			"ip":         clientIP(r),
+		})
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "Verification code sent.",
@@ -493,6 +504,10 @@ func (s *Server) handleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 	tenantID := *client.TenantID
 
+	if s.ephemeral == nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ephemeral_store_not_configured"})
+		return
+	}
 	cacheKey := fmt.Sprintf("otp:%s:%s", tenantID.String(), identifier)
 	var payload otpPayload
 	ok, err := s.ephemeral.Get(r.Context(), cacheKey, &payload)
