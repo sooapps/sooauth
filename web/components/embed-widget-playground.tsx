@@ -22,10 +22,24 @@ export function EmbedWidgetPlayground() {
   const [rememberMe, setRememberMe] = useState(true);
   const [previewTheme, setPreviewTheme] = useState<"light" | "dark">("light");
 
-  // Interactive password testing state
+  // Identifiers & Auth Mode
+  const [allowEmail, setAllowEmail] = useState(true);
+  const [allowUsername, setAllowUsername] = useState(true);
+  const [allowPhone, setAllowPhone] = useState(false);
+  const [authMode, setAuthMode] = useState<"password" | "otp">("password");
+  const [demoCustomFields, setDemoCustomFields] = useState(true);
+
+  // Interactive state
   const [testPassword, setTestPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [testIdentifier, setTestIdentifier] = useState("");
   const [testEmail, setTestEmail] = useState("");
+  const [testUsername, setTestUsername] = useState("");
+  const [testPhone, setTestPhone] = useState("");
+  const [testRank, setTestRank] = useState("Gold IV");
+  const [testDiscord, setTestDiscord] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [testOtpCode, setTestOtpCode] = useState("");
   const [copied, setCopied] = useState(false);
 
   // Password policy controls
@@ -42,7 +56,20 @@ export function EmbedWidgetPlayground() {
     setGithubEnabled(true);
     setRememberMe(true);
     setPreviewTheme("light");
+    setAllowEmail(true);
+    setAllowUsername(true);
+    setAllowPhone(false);
+    setAuthMode("password");
+    setDemoCustomFields(true);
     setTestPassword("");
+    setTestIdentifier("");
+    setTestEmail("");
+    setTestUsername("");
+    setTestPhone("");
+    setTestRank("Gold IV");
+    setTestDiscord("");
+    setOtpSent(false);
+    setTestOtpCode("");
     setMinLength(8);
     setRequireUpper(true);
     setRequireNumber(true);
@@ -66,6 +93,28 @@ export function EmbedWidgetPlayground() {
       ? [{ id: "special", label: "One special character", ok: /[^A-Za-z0-9]/.test(testPassword) }]
       : []),
   ];
+
+  const idLabel =
+    allowEmail && allowUsername && allowPhone
+      ? "Email, username or phone"
+      : allowEmail && allowUsername
+      ? "Email or username"
+      : allowEmail && allowPhone
+      ? "Email or phone"
+      : allowUsername && allowPhone
+      ? "Username or phone"
+      : allowUsername
+      ? "Username"
+      : allowPhone
+      ? "Phone number"
+      : "Email address";
+
+  const idPlaceholder =
+    allowPhone && !allowEmail && !allowUsername
+      ? "+1234567890"
+      : allowUsername && !allowEmail && !allowPhone
+      ? "username"
+      : "you@example.com or username";
 
   const codeSnippet = `<div id="sooauth-widget"></div>
 <script
@@ -102,7 +151,7 @@ export function EmbedWidgetPlayground() {
               Interactive Embed Widget Playground
             </h3>
             <p className="text-xs text-fg-muted text-pretty">
-              Customize social providers, themes, and branding to preview <span className="font-mono text-[11px] text-fg">embed.js</span> in real time.
+              Customize social providers, flexible identifiers (Email/Username/Phone), OTP mode, dynamic fields, and themes to preview <span className="font-mono text-[11px] text-fg">embed.js</span> in real time.
             </p>
           </div>
         </div>
@@ -130,7 +179,7 @@ export function EmbedWidgetPlayground() {
       {/* Main Split Body: Controls (Left) & Live Canvas (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
         {/* Controls Column */}
-        <div className="lg:col-span-5 border-b lg:border-b-0 lg:border-r border-line bg-surface p-6 space-y-6 overflow-y-auto max-h-[700px]">
+        <div className="lg:col-span-5 border-b lg:border-b-0 lg:border-r border-line bg-surface p-6 space-y-6 overflow-y-auto max-h-[720px]">
           {/* Mode Selector */}
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted">
@@ -139,7 +188,7 @@ export function EmbedWidgetPlayground() {
             <div className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-field p-1">
               <button
                 type="button"
-                onClick={() => setMode("signin")}
+                onClick={() => { setMode("signin"); setOtpSent(false); }}
                 className={`rounded-md py-2 text-xs font-semibold transition active:scale-[0.96] ${
                   mode === "signin"
                     ? "bg-accent text-white shadow-sm"
@@ -150,7 +199,7 @@ export function EmbedWidgetPlayground() {
               </button>
               <button
                 type="button"
-                onClick={() => setMode("signup")}
+                onClick={() => { setMode("signup"); setOtpSent(false); }}
                 className={`rounded-md py-2 text-xs font-semibold transition active:scale-[0.96] ${
                   mode === "signup"
                     ? "bg-accent text-white shadow-sm"
@@ -161,6 +210,100 @@ export function EmbedWidgetPlayground() {
               </button>
             </div>
           </div>
+
+          {/* Allowed Identifiers */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted">
+              Allowed Sign-in Identifiers
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              <label className="flex items-center gap-2 rounded-lg border border-line bg-field p-2 text-xs font-medium text-fg cursor-pointer hover:border-fg transition">
+                <input
+                  type="checkbox"
+                  checked={allowEmail}
+                  onChange={(e) => {
+                    if (!e.target.checked && !allowUsername && !allowPhone) return;
+                    setAllowEmail(e.target.checked);
+                  }}
+                  className="h-3.5 w-3.5 rounded border-line accent-[#FF3B3B]"
+                />
+                <span>Email</span>
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-line bg-field p-2 text-xs font-medium text-fg cursor-pointer hover:border-fg transition">
+                <input
+                  type="checkbox"
+                  checked={allowUsername}
+                  onChange={(e) => {
+                    if (!e.target.checked && !allowEmail && !allowPhone) return;
+                    setAllowUsername(e.target.checked);
+                  }}
+                  className="h-3.5 w-3.5 rounded border-line accent-[#FF3B3B]"
+                />
+                <span>Username</span>
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-line bg-field p-2 text-xs font-medium text-fg cursor-pointer hover:border-fg transition">
+                <input
+                  type="checkbox"
+                  checked={allowPhone}
+                  onChange={(e) => {
+                    if (!e.target.checked && !allowEmail && !allowUsername) return;
+                    setAllowPhone(e.target.checked);
+                  }}
+                  className="h-3.5 w-3.5 rounded border-line accent-[#FF3B3B]"
+                />
+                <span>Phone</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Primary Authentication Mode */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted">
+              Primary Authentication Mode
+            </label>
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-field p-1">
+              <button
+                type="button"
+                onClick={() => { setAuthMode("password"); setOtpSent(false); }}
+                className={`rounded-md py-1.5 text-xs font-semibold transition active:scale-[0.96] ${
+                  authMode === "password"
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-fg-muted hover:text-fg"
+                }`}
+              >
+                Password
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMode("otp"); setOtpSent(false); }}
+                className={`rounded-md py-1.5 text-xs font-semibold transition active:scale-[0.96] ${
+                  authMode === "otp"
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-fg-muted hover:text-fg"
+                }`}
+              >
+                Passwordless OTP
+              </button>
+            </div>
+          </div>
+
+          {/* Dynamic Registration Fields Demo (Sign up mode) */}
+          {mode === "signup" && (
+            <div className="space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted">
+                Custom Form Builder
+              </label>
+              <label className="flex items-center gap-2.5 text-xs text-fg cursor-pointer rounded-lg border border-line bg-field p-2.5 hover:border-fg transition">
+                <input
+                  type="checkbox"
+                  checked={demoCustomFields}
+                  onChange={(e) => setDemoCustomFields(e.target.checked)}
+                  className="h-4 w-4 rounded border-line text-accent accent-[#FF3B3B]"
+                />
+                <span>Include dynamic fields (e.g. Riot LoL Rank, Discord Tag)</span>
+              </label>
+            </div>
+          )}
 
           {/* Brand Name */}
           <div className="space-y-2">
@@ -237,25 +380,27 @@ export function EmbedWidgetPlayground() {
           </div>
 
           {/* Session & Options */}
-          <div className="space-y-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted">
-              Widget Options
-            </label>
+          {authMode === "password" && (
             <div className="space-y-2">
-              <label className="flex items-center gap-2.5 text-xs text-fg cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-line text-accent accent-[#FF3B3B]"
-                />
-                <span>Show &quot;Remember me&quot; session checkbox</span>
+              <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted">
+                Widget Options
               </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2.5 text-xs text-fg cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border-line text-accent accent-[#FF3B3B]"
+                  />
+                  <span>Show &quot;Remember me&quot; session checkbox</span>
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Password Policy (Sign up mode only) */}
-          {mode === "signup" && (
+          {/* Password Policy (Sign up mode with password only) */}
+          {mode === "signup" && authMode === "password" && (
             <div className="space-y-3 rounded-xl border border-line bg-field/60 p-4">
               <label className="block text-xs font-bold uppercase tracking-wider text-fg">
                 Password Policy Rules
@@ -345,7 +490,7 @@ export function EmbedWidgetPlayground() {
         >
           {/* Simulated Embed Widget Card */}
           <div
-            className={`w-full max-w-[380px] rounded-2xl border p-7 transition-all shadow-2xl ${
+            className={`w-full max-w-[390px] rounded-2xl border p-7 transition-all shadow-2xl ${
               previewTheme === "dark"
                 ? "bg-[#161719] border-[#2A2B2E] text-[#F5F6F6]"
                 : "bg-[#FFFFFF] border-[#E2E4E6] text-[#051B23]"
@@ -364,7 +509,9 @@ export function EmbedWidgetPlayground() {
               </div>
               <p className={`text-xs ${previewTheme === "dark" ? "text-[#9D9E9F]" : "text-[#5D6B70]"}`}>
                 {mode === "signin"
-                  ? "Sign in to continue to your account"
+                  ? authMode === "otp"
+                    ? "Passwordless sign-in via one-time code"
+                    : "Sign in to continue to your account"
                   : "Create an account to get started"}
               </p>
             </div>
@@ -412,107 +559,322 @@ export function EmbedWidgetPlayground() {
                   <span className={`relative px-3 text-[11px] uppercase tracking-wider font-semibold ${
                     previewTheme === "dark" ? "bg-[#161719] text-[#9D9E9F]" : "bg-[#FFFFFF] text-[#6B7280]"
                   }`}>
-                    or with email
+                    or with {idLabel.toLowerCase()}
                   </span>
                 </div>
               </div>
             )}
 
-            {/* Email Form */}
+            {/* Forms */}
             <form onSubmit={(e) => e.preventDefault()} className="space-y-3.5">
-              <div>
-                <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
-                  Email address
-                </label>
-                <input
-                  type="email"
-                  value={testEmail}
-                  onChange={(e) => setTestEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className={`w-full rounded-lg border px-3 py-2 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
-                    previewTheme === "dark"
-                      ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
-                      : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
-                  }`}
-                />
-              </div>
+              {mode === "signin" ? (
+                // --- SIGN IN MODE ---
+                authMode === "otp" ? (
+                  // OTP Flow
+                  !otpSent ? (
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                        {idLabel}
+                      </label>
+                      <input
+                        type={allowPhone && !allowEmail ? "tel" : "text"}
+                        value={testIdentifier}
+                        onChange={(e) => setTestIdentifier(e.target.value)}
+                        placeholder={idPlaceholder}
+                        className={`w-full rounded-lg border px-3 py-2 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                          previewTheme === "dark"
+                            ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                            : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setOtpSent(true)}
+                        style={{ backgroundColor: accentColor, color: accentFg }}
+                        className="w-full mt-3 rounded-lg py-2.5 px-4 text-xs font-bold tracking-tight transition hover:opacity-95 shadow-md active:scale-[0.96]"
+                      >
+                        Send verification code
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-center mb-3">
+                        <p className={`text-xs font-medium ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                          Enter the 6-digit code sent to <strong className="text-accent">{testIdentifier || "your account"}</strong>
+                        </p>
+                      </div>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={testOtpCode}
+                        onChange={(e) => setTestOtpCode(e.target.value)}
+                        placeholder="••••••"
+                        className={`w-full rounded-lg border px-3 py-2 text-center font-mono text-sm tracking-widest outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                          previewTheme === "dark"
+                            ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                            : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        style={{ backgroundColor: accentColor, color: accentFg }}
+                        className="w-full mt-3 rounded-lg py-2.5 px-4 text-xs font-bold tracking-tight transition hover:opacity-95 shadow-md active:scale-[0.96]"
+                      >
+                        Verify & Sign in
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOtpSent(false)}
+                        className={`w-full mt-2 text-center text-xs underline cursor-pointer ${previewTheme === "dark" ? "text-[#9D9E9F]" : "text-[#5D6B70]"}`}
+                      >
+                        Back to identifier input
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  // Password Flow
+                  <>
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                        {idLabel}
+                      </label>
+                      <input
+                        type={allowPhone && !allowEmail ? "tel" : "text"}
+                        value={testIdentifier}
+                        onChange={(e) => setTestIdentifier(e.target.value)}
+                        placeholder={idPlaceholder}
+                        className={`w-full rounded-lg border px-3 py-2 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                          previewTheme === "dark"
+                            ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                            : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                        }`}
+                      />
+                    </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className={`block text-xs font-semibold ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
-                    Password
-                  </label>
-                  {mode === "signin" && (
-                    <a href="#forgot" onClick={(e) => e.preventDefault()} className="text-[11px] text-accent hover:underline">
-                      Forgot password?
-                    </a>
-                  )}
-                </div>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={testPassword}
-                    onChange={(e) => setTestPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className={`w-full rounded-lg border px-3 py-2 pr-9 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
-                      previewTheme === "dark"
-                        ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
-                        : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg p-0.5"
-                  >
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-              </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`block text-xs font-semibold ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                          Password
+                        </label>
+                        {allowEmail && (
+                          <a href="#forgot" onClick={(e) => e.preventDefault()} className="text-[11px] text-accent hover:underline">
+                            Forgot password?
+                          </a>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={testPassword}
+                          onChange={(e) => setTestPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className={`w-full rounded-lg border px-3 py-2 pr-9 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                            previewTheme === "dark"
+                              ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                              : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg p-0.5"
+                        >
+                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
 
-              {/* Password Checklist in Sign Up mode */}
-              {mode === "signup" && (
-                <ul className="space-y-1 pt-1 pb-1">
-                  {rules.map((rule) => (
-                    <li
-                      key={rule.id}
-                      className={`flex items-center gap-2 text-[11px] transition-colors ${
-                        !testPassword
-                          ? previewTheme === "dark" ? "text-[#9D9E9F]" : "text-[#6B7280]"
-                          : rule.ok
-                          ? "text-emerald-500 font-medium"
-                          : "text-red-500"
-                      }`}
+                    {rememberMe && (
+                      <label className={`flex items-center gap-2 text-xs cursor-pointer ${previewTheme === "dark" ? "text-[#9D9E9F]" : "text-[#5D6B70]"}`}>
+                        <input
+                          type="checkbox"
+                          defaultChecked
+                          className="rounded border-line accent-[#FF3B3B]"
+                        />
+                        <span>Remember me on this device</span>
+                      </label>
+                    )}
+
+                    <button
+                      type="submit"
+                      style={{ backgroundColor: accentColor, color: accentFg }}
+                      className="w-full rounded-lg py-2.5 px-4 text-xs font-bold tracking-tight transition hover:opacity-95 shadow-md active:scale-[0.96]"
                     >
-                      <span className="w-3.5 text-center font-bold">
-                        {!testPassword ? "○" : rule.ok ? "✓" : "✗"}
-                      </span>
-                      <span>{rule.label}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                      Sign in to account
+                    </button>
+                  </>
+                )
+              ) : (
+                // --- SIGN UP MODE ---
+                <>
+                  {allowEmail && (
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                        Email address *
+                      </label>
+                      <input
+                        type="email"
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className={`w-full rounded-lg border px-3 py-2 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                          previewTheme === "dark"
+                            ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                            : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                        }`}
+                      />
+                    </div>
+                  )}
 
-              {/* Remember me option */}
-              {rememberMe && mode === "signin" && (
-                <label className={`flex items-center gap-2 text-xs cursor-pointer ${previewTheme === "dark" ? "text-[#9D9E9F]" : "text-[#5D6B70]"}`}>
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="rounded border-line accent-[#FF3B3B]"
-                  />
-                  <span>Remember me on this device</span>
-                </label>
-              )}
+                  {allowUsername && (
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                        Username {!allowEmail ? "*" : "(optional)"}
+                      </label>
+                      <input
+                        type="text"
+                        value={testUsername}
+                        onChange={(e) => setTestUsername(e.target.value)}
+                        placeholder="player_one"
+                        className={`w-full rounded-lg border px-3 py-2 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                          previewTheme === "dark"
+                            ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                            : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                        }`}
+                      />
+                    </div>
+                  )}
 
-              {/* Submit CTA */}
-              <button
-                type="submit"
-                style={{ backgroundColor: accentColor, color: accentFg }}
-                className="w-full rounded-lg py-2.5 px-4 text-xs font-bold tracking-tight transition hover:opacity-95 shadow-md active:scale-[0.96]"
-              >
-                {mode === "signin" ? "Sign in to account" : "Create account"}
-              </button>
+                  {allowPhone && (
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                        Phone number {!allowEmail && !allowUsername ? "*" : "(optional)"}
+                      </label>
+                      <input
+                        type="tel"
+                        value={testPhone}
+                        onChange={(e) => setTestPhone(e.target.value)}
+                        placeholder="+1 234 567 8900"
+                        className={`w-full rounded-lg border px-3 py-2 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                          previewTheme === "dark"
+                            ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                            : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                        }`}
+                      />
+                    </div>
+                  )}
+
+                  {authMode === "password" && (
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                        Password *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={testPassword}
+                          onChange={(e) => setTestPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className={`w-full rounded-lg border px-3 py-2 pr-9 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                            previewTheme === "dark"
+                              ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                              : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg p-0.5"
+                        >
+                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+
+                      <ul className="space-y-1 pt-2 pb-1">
+                        {rules.map((rule) => (
+                          <li
+                            key={rule.id}
+                            className={`flex items-center gap-2 text-[11px] transition-colors ${
+                              !testPassword
+                                ? previewTheme === "dark" ? "text-[#9D9E9F]" : "text-[#6B7280]"
+                                : rule.ok
+                                ? "text-emerald-500 font-medium"
+                                : "text-red-500"
+                            }`}
+                          >
+                            <span className="w-3.5 text-center font-bold">
+                              {!testPassword ? "○" : rule.ok ? "✓" : "✗"}
+                            </span>
+                            <span>{rule.label}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Custom Form Builder Demo Fields */}
+                  {demoCustomFields && (
+                    <div className="space-y-3 pt-1 border-t border-line/50">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className={`block text-xs font-semibold ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                            Competitive Rank (Dynamic API)
+                          </label>
+                          <span className="text-[10px] text-accent font-mono">live proxy</span>
+                        </div>
+                        <select
+                          value={testRank}
+                          onChange={(e) => setTestRank(e.target.value)}
+                          className={`w-full rounded-lg border px-3 py-2 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                            previewTheme === "dark"
+                              ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                              : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                          }`}
+                        >
+                          <option value="Iron IV">Iron IV</option>
+                          <option value="Bronze II">Bronze II</option>
+                          <option value="Silver I">Silver I</option>
+                          <option value="Gold IV">Gold IV</option>
+                          <option value="Platinum II">Platinum II</option>
+                          <option value="Emerald III">Emerald III</option>
+                          <option value="Diamond I">Diamond I</option>
+                          <option value="Master">Master</option>
+                          <option value="Grandmaster">Grandmaster</option>
+                          <option value="Challenger">Challenger</option>
+                        </select>
+                        <p className={`text-[10px] mt-0.5 ${previewTheme === "dark" ? "text-[#7B7C7E]" : "text-[#8D9094]"}`}>
+                          Fetched securely via server-side cached API proxy
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
+                          Discord Username
+                        </label>
+                        <input
+                          type="text"
+                          value={testDiscord}
+                          onChange={(e) => setTestDiscord(e.target.value)}
+                          placeholder="e.g. shadow#0001"
+                          className={`w-full rounded-lg border px-3 py-2 text-xs outline-none transition focus:ring-2 focus:ring-accent/20 ${
+                            previewTheme === "dark"
+                              ? "bg-[#1C1D1F] border-[#353537] text-[#F5F6F6] focus:border-accent"
+                              : "bg-[#FFFFFF] border-[#D0D2D4] text-[#051B23] focus:border-accent"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    style={{ backgroundColor: accentColor, color: accentFg }}
+                    className="w-full rounded-lg py-2.5 px-4 text-xs font-bold tracking-tight transition hover:opacity-95 shadow-md active:scale-[0.96]"
+                  >
+                    Create account
+                  </button>
+                </>
+              )}
             </form>
 
             {/* Widget Mode Switcher */}
@@ -522,7 +884,10 @@ export function EmbedWidgetPlayground() {
               </span>
               <button
                 type="button"
-                onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+                onClick={() => {
+                  setMode(mode === "signin" ? "signup" : "signin");
+                  setOtpSent(false);
+                }}
                 className="font-semibold text-accent hover:underline"
               >
                 {mode === "signin" ? "Sign up" : "Sign in"}
