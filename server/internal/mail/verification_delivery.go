@@ -254,3 +254,36 @@ func (t Transactional) PasswordResetDeliveryEmail(d PasswordResetDelivery, appSc
 
 	return subject, plain, htmlBody
 }
+
+// SignInCodeEmail renders a one-time sign-in code. mfa marks the second step
+// of a password sign-in instead of a passwordless sign-in.
+func (t Transactional) SignInCodeEmail(code string, mfa bool) (subject, plain, htmlBody string) {
+	brand := t.brand()
+	lang := t.lang()
+	subject = fmt.Sprintf(i18n.T(lang, "mail.otp.subject"), brand)
+	leadKey := "mail.otp.lead"
+	if mfa {
+		leadKey = "mail.otp.lead_mfa"
+	}
+	lead := fmt.Sprintf(i18n.T(lang, leadKey), brand)
+	footer := fmt.Sprintf(i18n.T(lang, "mail.otp.footer"), brand)
+	plain = fmt.Sprintf("%s\n\n%s\n\n%s\n\n— %s\n%s",
+		lead,
+		fmt.Sprintf(i18n.T(lang, "mail.otp.code_label"), code),
+		i18n.T(lang, "mail.otp.expires"),
+		brand,
+		strings.TrimSuffix(t.AppURL, "/"),
+	)
+	htmlBody = layoutVerificationEmail(verificationLayout{
+		Brand:    brand,
+		Title:    i18n.T(lang, "mail.otp.title"),
+		Lead:     lead,
+		Code:     code,
+		Note:     i18n.T(lang, "mail.otp.expires"),
+		Footer:   footer,
+		AppURL:   strings.TrimSuffix(t.AppURL, "/"),
+		Lang:     lang,
+		CopyLink: i18n.T(lang, "mail.copy_link"),
+	})
+	return subject, plain, htmlBody
+}

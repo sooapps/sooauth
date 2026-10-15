@@ -221,6 +221,19 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /auth/mfa/confirm", s.handleMFAConfirm)
 	mux.HandleFunc("POST /auth/mfa/disable", s.handleMFADisable)
 	mux.HandleFunc("POST /auth/mfa/verify", s.handleMFAVerify)
+	mux.HandleFunc("OPTIONS /auth/mfa/verify", s.handlePublicCORS)
+	mux.HandleFunc("POST /auth/mfa/setup", s.handleAppMFASetup)
+	mux.HandleFunc("OPTIONS /auth/mfa/setup", s.handlePublicCORS)
+	mux.HandleFunc("POST /auth/mfa/resend", s.handleAppMFAResend)
+	mux.HandleFunc("OPTIONS /auth/mfa/resend", s.handlePublicCORS)
+	mux.HandleFunc("GET /v1/me/mfa", s.handleAppMeMFA)
+	mux.HandleFunc("OPTIONS /v1/me/mfa", s.handlePublicCORS)
+	mux.HandleFunc("POST /v1/me/mfa/totp/start", s.handleAppMeTOTPStart)
+	mux.HandleFunc("OPTIONS /v1/me/mfa/totp/start", s.handlePublicCORS)
+	mux.HandleFunc("POST /v1/me/mfa/totp/confirm", s.handleAppMeTOTPConfirm)
+	mux.HandleFunc("OPTIONS /v1/me/mfa/totp/confirm", s.handlePublicCORS)
+	mux.HandleFunc("POST /v1/me/mfa/totp/disable", s.handleAppMeTOTPDisable)
+	mux.HandleFunc("OPTIONS /v1/me/mfa/totp/disable", s.handlePublicCORS)
 	mux.HandleFunc("POST /auth/resend-verification", s.handleResendVerification)
 	mux.HandleFunc("POST /auth/verify-code", s.handleVerifyCode)
 	mux.HandleFunc("GET /auth/verify-email", s.handleVerifyEmail)
@@ -283,6 +296,7 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("DELETE /dashboard/api/users/{id}", s.handleDashboardDeleteUser)
 	mux.HandleFunc("POST /dashboard/api/users/{id}/disable", s.handleDashboardDisableUser)
 	mux.HandleFunc("POST /dashboard/api/users/{id}/enable", s.handleDashboardEnableUser)
+	mux.HandleFunc("POST /dashboard/api/users/{id}/mfa/reset", s.handleDashboardResetUserMFA)
 	mux.HandleFunc("POST /dashboard/api/users/{id}/resend-verification", s.handleDashboardResendUserVerification)
 	mux.HandleFunc("GET /dashboard/api/sessions", s.handleDashboardSessions)
 	mux.HandleFunc("POST /dashboard/api/sessions/{id}/revoke", s.handleDashboardRevokeSession)
@@ -325,6 +339,10 @@ func withDashboardCORS(origin string, next http.Handler) http.Handler {
 		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		// Every dashboard write needs the double-submit CSRF token.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !accountCSRFValid(w, r) {
 			return
 		}
 		next.ServeHTTP(w, r)

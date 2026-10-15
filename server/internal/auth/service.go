@@ -34,7 +34,14 @@ var (
 	ErrUserDisabled       = errors.New("user disabled")
 )
 
-type MFARequiredError struct{ Challenge string }
+type MFARequiredError struct {
+	Challenge string
+	// Method is the second step the client should show: "totp", "email_otp"
+	// or "totp_setup" (the user must enroll an authenticator app first).
+	Method string
+	// Methods lists every method the user may switch to for this challenge.
+	Methods []string
+}
 
 func (e *MFARequiredError) Error() string { return "mfa required" }
 
@@ -47,6 +54,9 @@ const (
 
 type SignInOptions struct {
 	RememberMe bool
+	// Gate runs after the password matched and before tokens are issued. It can
+	// stop the sign-in, e.g. with *MFARequiredError for a second step.
+	Gate func(ctx context.Context, user *store.User) error
 }
 
 type TokenBundle struct {
@@ -271,6 +281,11 @@ func (s *Service) SignInAppByIdentifierWithOptions(ctx context.Context, tenantID
 	}
 	if found.DisabledAt != nil {
 		return nil, ErrUserDisabled
+	}
+	if opts.Gate != nil {
+		if err := opts.Gate(ctx, found); err != nil {
+			return nil, err
+		}
 	}
 
 	return s.completeSignIn(ctx, found, ip, userAgent, "signin", opts.RememberMe)
@@ -801,4 +816,10 @@ func trimSlash(u string) string {
 		u = u[:len(u)-1]
 	}
 	return u
+}
+
+// CompleteSignIn issues tokens for an already-authenticated user (for example
+// after a one-time code or a second factor) and records auditAction.
+func (s *Service) CompleteSignIn(ctx context.Context, user *store.User, ip, userAgent, auditAction string, rememberMe bool) (*TokenBundle, error) {
+	return s.completeSignIn(ctx, user, ip, userAgent, auditAction, rememberMe)
 }

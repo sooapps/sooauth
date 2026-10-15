@@ -134,3 +134,23 @@ func (s *MFA) ChallengeUser(ctx context.Context, hash string) (uuid.UUID, error)
 	}
 	return userID, err
 }
+
+func (s *MFA) EnabledAmong(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	out := make(map[uuid.UUID]bool, len(userIDs))
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.Query(ctx, `SELECT user_id FROM platform_mfa WHERE enabled_at IS NOT NULL AND user_id = ANY($1)`, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}

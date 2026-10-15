@@ -18,7 +18,6 @@ import (
 	"github.com/sooapps/sooauth/server/internal/billing"
 	"github.com/sooapps/sooauth/server/internal/emailverify"
 	"github.com/sooapps/sooauth/server/internal/mail"
-	"github.com/sooapps/sooauth/server/internal/passwordpolicy"
 	"github.com/sooapps/sooauth/server/internal/providers"
 	"github.com/sooapps/sooauth/server/internal/social"
 	"github.com/sooapps/sooauth/server/internal/store"
@@ -276,51 +275,75 @@ func (s *Server) handleDashboardProject(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Every field is optional: each dashboard page saves only its own section
+	// and the rest keeps its current value.
 	var body struct {
-		Name                   string                     `json:"name"`
-		EmailVerifyRequired    bool                       `json:"email_verify_required"`
-		EmailVerifyDelivery    string                     `json:"email_verify_delivery"`
-		PasswordMinLength      int                        `json:"password_min_length"`
-		PasswordRequireUpper   bool                       `json:"password_require_upper"`
-		PasswordRequireNumber  bool                       `json:"password_require_number"`
-		PasswordRequireSpecial bool                       `json:"password_require_special"`
-		DefaultLocale          string                     `json:"default_locale"`
-		AuthConfig             *store.AuthConfig          `json:"auth_config"`
+		Name                   *string                    `json:"name"`
+		EmailVerifyRequired    *bool                      `json:"email_verify_required"`
+		EmailVerifyDelivery    *string                    `json:"email_verify_delivery"`
+		PasswordMinLength      *int                       `json:"password_min_length"`
+		PasswordRequireUpper   *bool                      `json:"password_require_upper"`
+		PasswordRequireNumber  *bool                      `json:"password_require_number"`
+		PasswordRequireSpecial *bool                      `json:"password_require_special"`
+		DefaultLocale          *string                    `json:"default_locale"`
+		AuthConfig             json.RawMessage            `json:"auth_config"`
 		RegistrationSchema     *[]store.RegistrationField `json:"registration_schema"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
 		return
 	}
-	name := strings.TrimSpace(body.Name)
-	if name == "" {
-		name = dash.tenant.Name
+	t := dash.tenant
+	name := t.Name
+	if body.Name != nil && strings.TrimSpace(*body.Name) != "" {
+		name = strings.TrimSpace(*body.Name)
 	}
-	policy := passwordpolicy.Policy{
-		MinLength:        body.PasswordMinLength,
-		RequireUppercase: body.PasswordRequireUpper,
-		RequireNumber:    body.PasswordRequireNumber,
-		RequireSpecial:   body.PasswordRequireSpecial,
-	}.Normalize()
-	locale := body.DefaultLocale
-	if strings.TrimSpace(locale) == "" {
-		locale = dash.tenant.DefaultLocale
+	verifyRequired := t.EmailVerifyRequired
+	if body.EmailVerifyRequired != nil {
+		verifyRequired = *body.EmailVerifyRequired
 	}
-	if err := s.tenants.UpdateSettings(r.Context(), dash.tenant.ID, name, body.EmailVerifyRequired, emailverify.ParseDelivery(body.EmailVerifyDelivery), policy, locale); err != nil {
+	delivery := t.VerifyDelivery()
+	if body.EmailVerifyDelivery != nil {
+		delivery = emailverify.ParseDelivery(*body.EmailVerifyDelivery)
+	}
+	policy := t.PasswordPolicy()
+	if body.PasswordMinLength != nil {
+		policy.MinLength = *body.PasswordMinLength
+	}
+	if body.PasswordRequireUpper != nil {
+		policy.RequireUppercase = *body.PasswordRequireUpper
+	}
+	if body.PasswordRequireNumber != nil {
+		policy.RequireNumber = *body.PasswordRequireNumber
+	}
+	if body.PasswordRequireSpecial != nil {
+		policy.RequireSpecial = *body.PasswordRequireSpecial
+	}
+	policy = policy.Normalize()
+	locale := t.DefaultLocale
+	if body.DefaultLocale != nil && strings.TrimSpace(*body.DefaultLocale) != "" {
+		locale = *body.DefaultLocale
+	}
+	if err := s.tenants.UpdateSettings(r.Context(), t.ID, name, verifyRequired, delivery, policy, locale); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save_failed"})
 		return
 	}
 
-	if body.AuthConfig != nil || body.RegistrationSchema != nil {
-		authCfg := dash.tenant.AuthConfig
-		if body.AuthConfig != nil {
-			authCfg = *body.AuthConfig
+	if len(body.AuthConfig) > 0 || body.RegistrationSchema != nil {
+		authCfg := t.AuthConfig
+		if len(body.AuthConfig) > 0 && string(body.AuthConfig) != "null" {
+			// Merge onto the current config so a page that only sends some keys
+			// keeps the others.
+			if err := json.Unmarshal(body.AuthConfig, &authCfg); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_auth_config"})
+				return
+			}
 		}
-		schema := dash.tenant.RegistrationSchema
+		schema := t.RegistrationSchema
 		if body.RegistrationSchema != nil {
 			schema = *body.RegistrationSchema
 		}
-		if err := s.tenants.UpdateAuthConfigAndRegistrationSchema(r.Context(), dash.tenant.ID, authCfg, schema); err != nil {
+		if err := s.tenants.UpdateAuthConfigAndRegistrationSchema(r.Context(), t.ID, authCfg.Normalize(), schema); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save_failed"})
 			return
 		}
@@ -452,9 +475,18 @@ func (s *Server) handleDashboardUsers(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "list_failed"})
 		return
 	}
+	ids := make([]uuid.UUID, 0, len(users))
+	for _, u := range users {
+		ids = append(ids, u.ID)
+	}
+	mfaEnabled := map[uuid.UUID]bool{}
+	if s.mfa != nil {
+		mfaEnabled, _ = s.mfa.EnabledAmong(r.Context(), ids)
+	}
 	out := make([]map[string]any, 0, len(users))
 	for _, u := range users {
 		out = append(out, map[string]any{
+			"mfa_enabled":    mfaEnabled[u.ID],
 			"id":             u.ID,
 			"email":          u.Email,
 			"username":       u.Username,

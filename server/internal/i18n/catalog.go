@@ -192,6 +192,13 @@ var en = map[string]string{
 	"mail.reset.footer":        "If you didn't request a password reset, you can safely ignore this email.",
 	"mail.reset.app.footer":    "Authentication for %s is provided by sooauth. If you didn't request a password reset, you can safely ignore this email.",
 	"mail.reset.code_label":    "Your reset code: %s",
+	"mail.otp.subject":         "Your %s sign-in code",
+	"mail.otp.title":           "Your sign-in code",
+	"mail.otp.lead":            "Use this code to sign in to %s.",
+	"mail.otp.lead_mfa":        "Use this code to finish signing in to %s (two-step verification).",
+	"mail.otp.code_label":      "Your code: %s",
+	"mail.otp.expires":         "This code expires in 5 minutes. Never share it with anyone.",
+	"mail.otp.footer":          "Authentication for %s is provided by sooauth. If you didn't try to sign in, you can safely ignore this email.",
 	"mail.copy_link":           "Or copy this link:",
 }
 
@@ -382,5 +389,12 @@ var tr = map[string]string{
 	"mail.reset.footer":        "Şifre sıfırlama istemediyseniz bu e-postayı yok sayabilirsiniz.",
 	"mail.reset.app.footer":    "%s kimlik doğrulaması sooauth tarafından sağlanır. Şifre sıfırlama istemediyseniz bu e-postayı yok sayabilirsiniz.",
 	"mail.reset.code_label":    "Sıfırlama kodunuz: %s",
+	"mail.otp.subject":         "%s giriş kodunuz",
+	"mail.otp.title":           "Giriş kodunuz",
+	"mail.otp.lead":            "%s uygulamasına giriş yapmak için bu kodu kullanın.",
+	"mail.otp.lead_mfa":        "%s girişini tamamlamak için bu kodu kullanın (iki adımlı doğrulama).",
+	"mail.otp.code_label":      "Kodunuz: %s",
+	"mail.otp.expires":         "Bu kod 5 dakika içinde geçerliliğini yitirir. Kodu kimseyle paylaşmayın.",
+	"mail.otp.footer":          "%s kimlik doğrulaması sooauth tarafından sağlanır. Giriş yapmaya çalışmadıysanız bu e-postayı yok sayabilirsiniz.",
 	"mail.copy_link":           "Veya bu bağlantıyı kopyalayın:",
 }

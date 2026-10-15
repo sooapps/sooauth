@@ -17,25 +17,134 @@ import (
 
 type AuthConfig struct {
 	AllowedIdentifiers []string `json:"allowed_identifiers"` // "email", "username", "phone"
-	PrimaryAuthMode    string   `json:"primary_auth_mode"`   // "password", "otp", "both"
+	// PrimaryAuthMode: "password" (password only), "otp" (one-time code only) or
+	// "both" (the user picks password OR code on the sign-in screen).
+	PrimaryAuthMode string `json:"primary_auth_mode"`
+	// MFAPolicy controls a second step after a password sign-in:
+	// "off", "optional" (users opt in) or "required" (everyone).
+	MFAPolicy string `json:"mfa_policy"`
+	// MFAMethods lists the second-step methods users may use: "email_otp", "totp".
+	MFAMethods []string `json:"mfa_methods"`
+	// PhoneOTPViaWebhook delivers phone codes inside the otp.sent webhook so the
+	// project can send the SMS with its own provider.
+	PhoneOTPViaWebhook bool `json:"phone_otp_via_webhook"`
 }
+
+const (
+	AuthModePassword = "password"
+	AuthModeOTP      = "otp"
+	AuthModeBoth     = "both"
+
+	MFAPolicyOff      = "off"
+	MFAPolicyOptional = "optional"
+	MFAPolicyRequired = "required"
+
+	MFAMethodEmailOTP = "email_otp"
+	MFAMethodTOTP     = "totp"
+)
 
 func DefaultAuthConfig() AuthConfig {
 	return AuthConfig{
 		AllowedIdentifiers: []string{"email"},
-		PrimaryAuthMode:    "password",
+		PrimaryAuthMode:    AuthModePassword,
+		MFAPolicy:          MFAPolicyOff,
+		MFAMethods:         []string{MFAMethodEmailOTP, MFAMethodTOTP},
 	}
 }
 
 func (c AuthConfig) Normalize() AuthConfig {
+	c.AllowedIdentifiers = filterKnown(c.AllowedIdentifiers, "email", "username", "phone")
 	if len(c.AllowedIdentifiers) == 0 {
 		c.AllowedIdentifiers = []string{"email"}
 	}
-	validModes := map[string]bool{"password": true, "otp": true, "both": true}
-	if !validModes[c.PrimaryAuthMode] {
-		c.PrimaryAuthMode = "password"
+	switch c.PrimaryAuthMode {
+	case AuthModePassword, AuthModeOTP, AuthModeBoth:
+	default:
+		c.PrimaryAuthMode = AuthModePassword
+	}
+	switch c.MFAPolicy {
+	case MFAPolicyOff, MFAPolicyOptional, MFAPolicyRequired:
+	default:
+		c.MFAPolicy = MFAPolicyOff
+	}
+	c.MFAMethods = filterKnown(c.MFAMethods, MFAMethodEmailOTP, MFAMethodTOTP)
+	if len(c.MFAMethods) == 0 {
+		c.MFAMethods = []string{MFAMethodEmailOTP, MFAMethodTOTP}
 	}
 	return c
+}
+
+func (c AuthConfig) AllowsPassword() bool {
+	return c.PrimaryAuthMode != AuthModeOTP
+}
+
+func (c AuthConfig) AllowsOTP() bool {
+	return c.PrimaryAuthMode == AuthModeOTP || c.PrimaryAuthMode == AuthModeBoth
+}
+
+func (c AuthConfig) AllowsIdentifier(kind string) bool {
+	for _, id := range c.AllowedIdentifiers {
+		if id == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func (c AuthConfig) AllowsMFAMethod(method string) bool {
+	for _, m := range c.MFAMethods {
+		if m == method {
+			return true
+		}
+	}
+	return false
+}
+
+// MFAEnabled reports whether a second step can run for this project at all.
+func (c AuthConfig) MFAEnabled() bool {
+	return c.MFAPolicy == MFAPolicyOptional || c.MFAPolicy == MFAPolicyRequired
+}
+
+// IdentifierKind classifies a sign-in identifier as "email", "phone" or "username".
+func IdentifierKind(identifier string) string {
+	identifier = strings.TrimSpace(identifier)
+	if strings.Contains(identifier, "@") {
+		return "email"
+	}
+	if strings.HasPrefix(identifier, "+") {
+		return "phone"
+	}
+	digits := 0
+	for _, r := range identifier {
+		switch {
+		case r >= '0' && r <= '9':
+			digits++
+		case r == ' ' || r == '-' || r == '(' || r == ')':
+		default:
+			return "username"
+		}
+	}
+	if digits >= 7 {
+		return "phone"
+	}
+	return "username"
+}
+
+func filterKnown(values []string, known ...string) []string {
+	allowed := make(map[string]bool, len(known))
+	for _, k := range known {
+		allowed[k] = true
+	}
+	seen := make(map[string]bool)
+	var out []string
+	for _, v := range values {
+		v = strings.ToLower(strings.TrimSpace(v))
+		if allowed[v] && !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 type SelectOption struct {

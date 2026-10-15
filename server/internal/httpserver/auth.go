@@ -249,12 +249,16 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	var bundle *auth.TokenBundle
 	var err error
 	if strings.TrimSpace(body.ClientID) != "" {
-		bundle, err = s.signInAppUser(r.Context(), body.ClientID, identifier, body.Password, clientIP(r), r.UserAgent(), rememberMe)
+		bundle, err = s.signInAppUser(r, body.ClientID, identifier, body.Password, clientIP(r), r.UserAgent(), rememberMe)
 	} else {
 		bundle, err = s.auth.SignInWithOptions(r.Context(), identifier, body.Password, clientIP(r), r.UserAgent(), auth.SignInOptions{RememberMe: rememberMe})
 	}
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
+		return
+	}
+	if errors.Is(err, errPasswordLoginDisabled) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "password_login_disabled", "message": "This project signs in with one-time codes only."})
 		return
 	}
 	if err == auth.ErrEmailNotVerified {
@@ -271,10 +275,11 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 	var mfaErr *auth.MFARequiredError
 	if errors.As(err, &mfaErr) {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{
-			"error":     "mfa_required",
-			"challenge": mfaErr.Challenge,
-		})
+		writeJSON(w, http.StatusUnauthorized, mfaRequiredBody(mfaErr))
+		return
+	}
+	if errors.Is(err, auth.ErrEmailDelivery) {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "otp_delivery_failed"})
 		return
 	}
 	if err != nil {
@@ -362,12 +367,19 @@ func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMFAVerify(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Challenge string `json:"challenge"`
-		Code      string `json:"code"`
+	setPublicCORS(w, r)
+	if corsPreflight(w, r) {
+		return
 	}
+	var body appMFAVerifyBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	// Project end users finish their own second step; dashboard accounts keep
+	// the platform TOTP flow below.
+	if user, tenant, _, err := s.appChallengeUser(r.Context(), body.Challenge); err == nil && tenant != nil {
+		s.handleAppMFAVerify(w, r, body, user, tenant)
 		return
 	}
 	bundle, err := s.auth.VerifyMFA(r.Context(), body.Challenge, body.Code, clientIP(r), r.UserAgent())

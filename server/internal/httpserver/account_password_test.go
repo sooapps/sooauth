@@ -20,6 +20,7 @@ import (
 	"github.com/sooapps/sooauth/server/internal/ephemeral"
 	"github.com/sooapps/sooauth/server/internal/fields"
 	"github.com/sooapps/sooauth/server/internal/mail"
+	"github.com/sooapps/sooauth/server/internal/mfa"
 	"github.com/sooapps/sooauth/server/internal/migrate"
 	"github.com/sooapps/sooauth/server/internal/oidc"
 	"github.com/sooapps/sooauth/server/internal/ratelimit"
@@ -136,6 +137,7 @@ func setupTestServer(t *testing.T) (*Server, *pgxpool.Pool, *appjwt.Issuer) {
 		webhookStore:   webhookStore,
 		dynamicOptions: dynamicOptions,
 		tenantUsers:    store.NewTenantUsers(db),
+		mfa:            mfa.NewService(store.NewMFA(db, []byte("0123456789abcdef0123456789abcdef"))),
 		oidc: oidc.NewService(
 			cfg.AppURL,
 			store.NewOAuthClients(db),
