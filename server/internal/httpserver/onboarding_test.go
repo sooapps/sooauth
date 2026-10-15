@@ -74,3 +74,28 @@ func TestAuthorizeAcceptsDashboardTestCallback(t *testing.T) {
 		t.Fatalf("test callback not accepted: %d %q", w.Code, loc)
 	}
 }
+
+func TestAuthorizePromptLoginShowsSignIn(t *testing.T) {
+	f := newIsolationFixture(t)
+	q := url.Values{
+		"client_id":             {f.client.ClientID},
+		"redirect_uri":          {f.client.RedirectURIs[0]},
+		"response_type":         {"code"},
+		"scope":                 {"openid"},
+		"code_challenge":        {"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"},
+		"code_challenge_method": {"S256"},
+		"prompt":                {"login"},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+q.Encode(), nil)
+	req.AddCookie(&http.Cookie{Name: appSessionCookie, Value: f.appTok.SessionToken})
+	w := httptest.NewRecorder()
+	f.s.Router().ServeHTTP(w, req)
+	loc := w.Header().Get("Location")
+	if !strings.Contains(loc, "/auth/sign-in") {
+		t.Fatalf("prompt=login must show sign-in, got %q", loc)
+	}
+	back, _ := url.Parse(loc)
+	if strings.Contains(back.Query().Get("return_to"), "prompt=login") {
+		t.Fatal("return_to must drop prompt=login to avoid a loop")
+	}
+}

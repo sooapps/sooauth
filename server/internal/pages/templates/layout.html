@@ -56,7 +56,9 @@
       </button>
     </footer>{{end}}
   </div>
-  <script src="/auth/static/app.js?v=10"></script>
+  {{if .ClientID}}<script>window.__sooauthProject = {{.ClientID}};</script>{{end}}
+  <script src="/auth/static/app.js?v=11"></script>
+  {{if .ClientID}}<script src="/auth/static/project.js?v=1"></script>{{end}}
 </body>
 </html>
 {{end}}

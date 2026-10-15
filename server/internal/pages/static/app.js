@@ -265,6 +265,7 @@ const signIn = document.getElementById("sign-in-form");
 if (signIn) {
   signIn.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (window.__sooauthProject) return; // handled by project.js
     clearFeedback(signIn);
     signIn.querySelector(".resend-wrap")?.remove();
     const stopLoading = setSubmitLoading(signIn, true, t("js.signing_in", "Signing in…"));
@@ -302,6 +303,7 @@ const signUp = document.getElementById("sign-up-form");
 if (signUp) {
   signUp.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (window.__sooauthProject) return; // handled by project.js
     clearFeedback(signUp);
     const stopLoading = setSubmitLoading(signUp, true, t("js.creating", "Creating account…"));
     const fd = new FormData(signUp);

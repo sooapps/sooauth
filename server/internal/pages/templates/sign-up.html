@@ -77,10 +77,12 @@
         <a href="/auth/sign-up{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}" class="mobile-switch-link">{{index .T "auth.create_account"}}</a>
       </div>
 
+      {{if not .ClientID}}
       <div class="passkey">
         <button type="button" id="passkey-sign-in" class="btn ghost">{{index .T "auth.passkey_sign_in"}}</button>
         <p class="passkey-hint">{{index .T "auth.passkey_hint"}}</p>
       </div>
+      {{end}}
     </div>
   </div>
 

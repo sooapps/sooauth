@@ -51,6 +51,8 @@ export function LiveTest({ compact }: { compact?: boolean }) {
       nonce: randomString(12),
       code_challenge: challenge,
       code_challenge_method: "S256",
+      // Always show the sign-in page, even if a test user is still signed in.
+      prompt: "login",
     });
     const popup = window.open(`${issuerBase()}/oauth/authorize?${q}`, "sooauth-live-test", "width=480,height=720");
     if (!popup) {

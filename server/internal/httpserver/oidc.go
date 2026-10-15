@@ -33,9 +33,21 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	if user == nil || s.tenantFromClientID(r.Context(), in.ClientID) == nil {
 		user, _ = s.currentUser(r)
 	}
+	// prompt=login forces the sign-in page even with an existing session (the
+	// dashboard live test uses it). The prompt is dropped from return_to so
+	// the request continues normally after signing in.
+	returnTo := r.URL
+	if r.URL.Query().Get("prompt") == "login" {
+		user = nil
+		q := r.URL.Query()
+		q.Del("prompt")
+		next := *r.URL
+		next.RawQuery = q.Encode()
+		returnTo = &next
+	}
 	result, err := s.oidc.Authorize(r.Context(), in, user)
 	if err == oidc.ErrLoginRequired {
-		loginURL := strings.TrimRight(s.cfg.AppURL, "/") + "/auth/sign-in?return_to=" + url.QueryEscape(r.URL.String())
+		loginURL := strings.TrimRight(s.cfg.AppURL, "/") + "/auth/sign-in?return_to=" + url.QueryEscape(returnTo.String())
 		if in.ClientID != "" {
 			loginURL += "&client_id=" + url.QueryEscape(in.ClientID)
 		}
