@@ -1,3 +1,5 @@
+import { enExtra, trExtra } from "./strings";
+
 export type Lang = "en" | "tr";
 
 const STORAGE_KEY = "admin-lang";
@@ -627,7 +629,10 @@ const tr: Record<string, string> = {
   "email.testFailed": "Test başarısız: {message}",
 };
 
-const dictionaries: Record<Lang, Record<string, string>> = { en, tr };
+const dictionaries: Record<Lang, Record<string, string>> = {
+  en: { ...en, ...enExtra },
+  tr: { ...tr, ...trExtra },
+};
 
 export function t(lang: Lang, key: string, vars?: Vars): string {
   const dict = dictionaries[lang] || dictionaries.en;
