@@ -473,9 +473,41 @@ func (s *Server) handleDashboardUsers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"users": out})
 }
 
+// revokeUserAccess ends every session and refresh token of a single user id.
+// It never touches other accounts that share the same email.
+func (s *Server) revokeUserAccess(r *http.Request, userID uuid.UUID) {
+	_ = s.sessions.RevokeAllForUser(r.Context(), userID)
+	if s.refresh != nil {
+		_ = s.refresh.RevokeAllForUser(r.Context(), userID)
+	}
+}
+
+func (s *Server) clearOTPState(r *http.Request, tenantID uuid.UUID, user *store.User) {
+	if s.ephemeral == nil {
+		return
+	}
+	for _, id := range userIdentifiers(user) {
+		_ = s.ephemeral.Delete(r.Context(), otpCacheKey(tenantID, id))
+	}
+}
+
+func userIdentifiers(user *store.User) []string {
+	var out []string
+	if user.Email != "" {
+		out = append(out, user.Email)
+	}
+	if user.Username != nil && *user.Username != "" {
+		out = append(out, *user.Username)
+	}
+	if user.Phone != nil && *user.Phone != "" {
+		out = append(out, *user.Phone)
+	}
+	return out
+}
+
 func (s *Server) handleDashboardDeleteUser(w http.ResponseWriter, r *http.Request) {
 	dash, ok := s.requireDashboard(w, r)
-	if !ok {
+	if !ok || !accountCSRFValid(w, r) {
 		return
 	}
 	idStr := r.PathValue("id")
@@ -515,12 +547,24 @@ func (s *Server) handleDashboardDeleteUser(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	_ = s.sessions.RevokeAllForUser(r.Context(), userID)
+	deleted, _ := s.users.FindByID(r.Context(), userID)
+	s.revokeUserAccess(r, userID)
 	if err := s.tenantUsers.Unlink(r.Context(), dash.tenant.ID, userID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "remove_failed"})
 		return
 	}
-	_ = s.users.DeleteOrphanAppUser(r.Context(), userID)
+	// Credentials, sessions, refresh tokens, authorization codes, verification
+	// tokens and identities are removed by ON DELETE CASCADE.
+	if err := s.users.DeleteOrphanAppUser(r.Context(), userID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "remove_failed"})
+		return
+	}
+	if deleted != nil {
+		s.clearOTPState(r, dash.tenant.ID, deleted)
+		if s.webhooks != nil {
+			s.webhooks.Emit(r.Context(), &dash.tenant.ID, "user.deleted", deleted, nil)
+		}
+	}
 
 	uid := dash.user.ID
 	s.audit.Log(r.Context(), &uid, "app_user_removed", map[string]any{
@@ -568,7 +612,7 @@ func (s *Server) handleDashboardDisableUser(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 		return
 	}
-	_ = s.sessions.RevokeAllForUser(r.Context(), userID)
+	s.revokeUserAccess(r, userID)
 	uid := dash.user.ID
 	s.audit.Log(r.Context(), &uid, "app_user_disabled", map[string]any{"disabled_user_id": userID.String(), "tenant_id": dash.tenant.ID.String()}, clientIP(r))
 	writeJSON(w, http.StatusOK, map[string]string{"message": "disabled"})
@@ -717,7 +761,7 @@ func (s *Server) handleDashboardSessions(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	rows, err := s.sessions.ListActiveByTenant(r.Context(), dash.tenant.ID, dash.user.ID, 100)
+	rows, err := s.sessions.ListActiveByTenant(r.Context(), dash.tenant.ID, 100)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "list_failed"})
 		return
@@ -746,7 +790,7 @@ func (s *Server) handleDashboardRevokeSession(w http.ResponseWriter, r *http.Req
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_id"})
 		return
 	}
-	revoked, err := s.sessions.RevokeByIDForTenant(r.Context(), id, dash.tenant.ID, dash.user.ID)
+	revoked, err := s.sessions.RevokeByIDForTenant(r.Context(), id, dash.tenant.ID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "revoke_failed"})
 		return

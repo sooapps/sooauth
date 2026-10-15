@@ -113,6 +113,14 @@ func (s *Server) handleSocialCallback(w http.ResponseWriter, r *http.Request) {
 		saved.AppReturn = true
 	}
 
+	// Hosted OIDC sign-in: keep the project session in the app cookie and
+	// continue the /oauth/authorize request.
+	if saved.AppReturn && s.isAuthorizeReturn(saved.ReturnTo) && bundle.User != nil && bundle.User.TenantID != nil {
+		setAppSessionCookie(w, s.cfg.CookieSecure, s.cfg.CookieDomain, bundle)
+		http.Redirect(w, r, saved.ReturnTo, http.StatusFound)
+		return
+	}
+
 	if saved.AppReturn {
 		widgetCode, err := randomWidgetCode()
 		if err != nil {
@@ -130,6 +138,14 @@ func (s *Server) handleSocialCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if bundle.User == nil {
+		http.Redirect(w, r, "/auth/sign-in?error=social_failed", http.StatusFound)
+		return
+	}
+	if platform, _ := s.users.IsPlatformOwner(r.Context(), bundle.User.ID); !platform {
+		http.Redirect(w, r, "/auth/sign-in?error=app_account_dashboard", http.StatusFound)
+		return
+	}
 	setAuthCookies(w, s.cfg.CookieSecure, s.cfg.CookieDomain, bundle)
 	target := saved.ReturnTo
 	if target == "" || strings.Contains(target, "/auth/sign-in") {
@@ -149,6 +165,22 @@ func (s *Server) handleSocialCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.Redirect(w, r, target, http.StatusFound)
+}
+
+// isAuthorizeReturn reports whether returnTo continues an OIDC authorize request
+// on this server (relative path or our own AppURL).
+func (s *Server) isAuthorizeReturn(returnTo string) bool {
+	u, err := url.Parse(returnTo)
+	if err != nil {
+		return false
+	}
+	if u.Host != "" {
+		app, err := url.Parse(s.cfg.AppURL)
+		if err != nil || !strings.EqualFold(app.Host, u.Host) {
+			return false
+		}
+	}
+	return u.Path == "/oauth/authorize"
 }
 
 func isDashboardDestination(target string) bool {

@@ -163,8 +163,8 @@ func (s *Service) Authorize(ctx context.Context, in AuthorizeInput, user *store.
 		return nil, ErrInvalidScope
 	}
 
-	if client.TenantID != nil {
-		_ = s.users.EnsureTenant(ctx, user.ID, *client.TenantID)
+	if !userBelongsToClient(user, client) {
+		return nil, ErrLoginRequired
 	}
 
 	plain, hash, err := token.Generate()
@@ -223,7 +223,7 @@ func (s *Service) ExchangeCode(ctx context.Context, in TokenInput, ip string) (*
 	}
 
 	user, err := s.users.FindByID(ctx, ac.UserID)
-	if err != nil || user == nil {
+	if err != nil || user == nil || user.DisabledAt != nil || !userBelongsToClient(user, client) {
 		return nil, ErrInvalidGrant
 	}
 
@@ -314,6 +314,20 @@ func (s *Service) validateClient(ctx context.Context, clientID, clientSecret str
 		return nil, ErrUnauthorizedClient
 	}
 	return client, nil
+}
+
+// userBelongsToClient keeps platform (dashboard) accounts and project end users
+// apart: a project client only accepts users of that project, and a platform
+// client only accepts platform users. A dashboard session must never be reused
+// to sign in to a project app.
+func userBelongsToClient(user *store.User, client *store.OAuthClient) bool {
+	if user == nil || client == nil {
+		return false
+	}
+	if client.TenantID == nil {
+		return user.TenantID == nil
+	}
+	return user.TenantID != nil && *user.TenantID == *client.TenantID
 }
 
 func verifyPKCE(challenge, method, verifier string) bool {

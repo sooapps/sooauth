@@ -408,6 +408,10 @@ func (s *Server) handleWidgetFieldOptions(w http.ResponseWriter, r *http.Request
 	})
 }
 
+func otpCacheKey(tenantID uuid.UUID, identifier string) string {
+	return fmt.Sprintf("otp:%s:%s", tenantID.String(), strings.ToLower(strings.TrimSpace(identifier)))
+}
+
 type otpPayload struct {
 	Code       string `json:"code"`
 	Identifier string `json:"identifier"`
@@ -446,7 +450,7 @@ func (s *Server) handleSendOTP(w http.ResponseWriter, r *http.Request) {
 
 	code := fmt.Sprintf("%06d", (time.Now().UnixNano()%900000)+100000)
 
-	cacheKey := fmt.Sprintf("otp:%s:%s", tenantID.String(), identifier)
+	cacheKey := otpCacheKey(tenantID, identifier)
 	if s.ephemeral == nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ephemeral_store_not_configured"})
 		return
@@ -508,7 +512,7 @@ func (s *Server) handleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ephemeral_store_not_configured"})
 		return
 	}
-	cacheKey := fmt.Sprintf("otp:%s:%s", tenantID.String(), identifier)
+	cacheKey := otpCacheKey(tenantID, identifier)
 	var payload otpPayload
 	ok, err := s.ephemeral.Get(r.Context(), cacheKey, &payload)
 	if err != nil || !ok || payload.Code != code {

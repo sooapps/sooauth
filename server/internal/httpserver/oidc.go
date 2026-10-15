@@ -27,10 +27,18 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		Nonce:               r.URL.Query().Get("nonce"),
 	}
 
-	user, _ := s.currentUser(r)
+	// Project clients use the hosted app session; platform clients use the
+	// dashboard session. Authorize rejects a user from the wrong side.
+	user := s.appSessionUser(r)
+	if user == nil || s.tenantFromClientID(r.Context(), in.ClientID) == nil {
+		user, _ = s.currentUser(r)
+	}
 	result, err := s.oidc.Authorize(r.Context(), in, user)
 	if err == oidc.ErrLoginRequired {
 		loginURL := strings.TrimRight(s.cfg.AppURL, "/") + "/auth/sign-in?return_to=" + url.QueryEscape(r.URL.String())
+		if in.ClientID != "" {
+			loginURL += "&client_id=" + url.QueryEscape(in.ClientID)
+		}
 		http.Redirect(w, r, loginURL, http.StatusFound)
 		return
 	}

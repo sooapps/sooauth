@@ -455,6 +455,10 @@ func (s *Service) Refresh(ctx context.Context, plainRefresh, ip string) (*TokenB
 	if err != nil || user == nil {
 		return nil, ErrInvalidToken
 	}
+	if user.DisabledAt != nil {
+		_ = s.refresh.RevokeFamily(ctx, rt.FamilyID)
+		return nil, ErrUserDisabled
+	}
 
 	newPlain, newHash, err := token.Generate()
 	if err != nil {
@@ -754,7 +758,7 @@ func (s *Service) SessionUser(ctx context.Context, sessionToken string) (*store.
 	if err != nil || sess == nil {
 		return nil, err
 	}
-	return s.users.FindByID(ctx, sess.UserID)
+	return activeUser(s.users.FindByID(ctx, sess.UserID))
 }
 
 func (s *Service) UserFromAccess(ctx context.Context, accessToken string) (*store.User, error) {
@@ -769,7 +773,19 @@ func (s *Service) UserFromAccess(ctx context.Context, accessToken string) (*stor
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	return s.users.FindByID(ctx, userID)
+	return activeUser(s.users.FindByID(ctx, userID))
+}
+
+// activeUser rejects disabled accounts so existing sessions and access tokens
+// stop working as soon as a user is disabled.
+func activeUser(user *store.User, err error) (*store.User, error) {
+	if err != nil || user == nil {
+		return user, err
+	}
+	if user.DisabledAt != nil {
+		return nil, ErrUserDisabled
+	}
+	return user, nil
 }
 
 func randomToken(n int) (string, error) {

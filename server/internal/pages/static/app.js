@@ -272,11 +272,18 @@ if (signIn) {
     const rememberMeInput = signIn.querySelector('input[name="remember_me"]');
     const rememberMe = rememberMeInput ? rememberMeInput.checked : true;
     try {
-      await postJSON("/auth/sign-in", {
+      const signInBody = {
         email: fd.get("email"),
         password: fd.get("password"),
         remember_me: rememberMe,
-      });
+      };
+      // Project sign-in (OIDC hosted page): sign in as the project's end user
+      // and keep that session apart from the dashboard session.
+      if (signIn.dataset.clientId) {
+        signInBody.client_id = signIn.dataset.clientId;
+        signInBody.hosted = true;
+      }
+      await postJSON("/auth/sign-in", signInBody);
       stopLoading();
       setSubmitLoading(signIn, true, t("js.redirecting", "Redirecting…"));
       afterLoginRedirect();
@@ -299,14 +306,19 @@ if (signUp) {
     const stopLoading = setSubmitLoading(signUp, true, t("js.creating", "Creating account…"));
     const fd = new FormData(signUp);
     try {
-      await postJSON("/auth/sign-up", {
+      const signUpBody = {
         email: fd.get("email"),
         password: fd.get("password"),
-      });
+      };
+      if (signUp.dataset.clientId) {
+        signUpBody.client_id = signUp.dataset.clientId;
+      }
+      await postJSON("/auth/sign-up", signUpBody);
       stopLoading();
       setSubmitLoading(signUp, true, t("js.redirecting", "Redirecting…"));
-      const msg = encodeURIComponent(t("js.verify_email_message", "Check your email to verify"));
-      location.href = "/auth/sign-in?message=" + msg;
+      const next = new URLSearchParams(location.search);
+      next.set("message", t("js.verify_email_message", "Check your email to verify"));
+      location.href = "/auth/sign-in?" + next.toString();
     } catch (err) {
       stopLoading();
       showError(signUp, errorText(err));

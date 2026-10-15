@@ -71,6 +71,6 @@ func (s *Server) handlePasskeySignInFinish(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "passkey_finish_failed"})
 		return
 	}
-	setAuthCookies(w, s.cfg.CookieSecure, s.cfg.CookieDomain, bundle)
+	s.setSessionCookiesFor(w, r, bundle)
 	writeJSON(w, http.StatusOK, map[string]string{"message": "signed_in"})
 }
