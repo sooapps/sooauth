@@ -187,7 +187,24 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 		dynamicOptions: fields.NewDynamicOptionsService(),
 	}
 
+	s.oidc.SetExtraRedirectURIs(s.testRedirectURIs())
 	return s, nil
+}
+
+// testRedirectURIs are the dashboard's live-test callback pages. Every project
+// client accepts them so owners can try sign-in before wiring their own app.
+func (s *Server) testRedirectURIs() []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, origin := range []string{s.cfg.DashboardOrigin, s.cfg.AppURL} {
+		origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+		if origin == "" || seen[origin] {
+			continue
+		}
+		seen[origin] = true
+		out = append(out, origin+"/dashboard/test-callback")
+	}
+	return out
 }
 
 func (s *Server) Router() http.Handler {
@@ -221,6 +238,19 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /auth/mfa/confirm", s.handleMFAConfirm)
 	mux.HandleFunc("POST /auth/mfa/disable", s.handleMFADisable)
 	mux.HandleFunc("POST /auth/mfa/verify", s.handleMFAVerify)
+	mux.HandleFunc("OPTIONS /auth/mfa/verify", s.handlePublicCORS)
+	mux.HandleFunc("POST /auth/mfa/setup", s.handleAppMFASetup)
+	mux.HandleFunc("OPTIONS /auth/mfa/setup", s.handlePublicCORS)
+	mux.HandleFunc("POST /auth/mfa/resend", s.handleAppMFAResend)
+	mux.HandleFunc("OPTIONS /auth/mfa/resend", s.handlePublicCORS)
+	mux.HandleFunc("GET /v1/me/mfa", s.handleAppMeMFA)
+	mux.HandleFunc("OPTIONS /v1/me/mfa", s.handlePublicCORS)
+	mux.HandleFunc("POST /v1/me/mfa/totp/start", s.handleAppMeTOTPStart)
+	mux.HandleFunc("OPTIONS /v1/me/mfa/totp/start", s.handlePublicCORS)
+	mux.HandleFunc("POST /v1/me/mfa/totp/confirm", s.handleAppMeTOTPConfirm)
+	mux.HandleFunc("OPTIONS /v1/me/mfa/totp/confirm", s.handlePublicCORS)
+	mux.HandleFunc("POST /v1/me/mfa/totp/disable", s.handleAppMeTOTPDisable)
+	mux.HandleFunc("OPTIONS /v1/me/mfa/totp/disable", s.handlePublicCORS)
 	mux.HandleFunc("POST /auth/resend-verification", s.handleResendVerification)
 	mux.HandleFunc("POST /auth/verify-code", s.handleVerifyCode)
 	mux.HandleFunc("GET /auth/verify-email", s.handleVerifyEmail)
@@ -277,12 +307,15 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("GET /dashboard/api/project", s.handleDashboardProject)
 	mux.HandleFunc("PUT /dashboard/api/project", s.handleDashboardProject)
 	mux.HandleFunc("POST /dashboard/api/registration-schema/test-api", s.handleDashboardTestAPI)
+	mux.HandleFunc("GET /dashboard/api/onboarding", s.handleDashboardOnboarding)
+	mux.HandleFunc("PUT /dashboard/api/onboarding", s.handleDashboardOnboarding)
 	mux.HandleFunc("GET /dashboard/api/integration", s.handleDashboardIntegration)
 	mux.HandleFunc("PUT /dashboard/api/integration", s.handleDashboardIntegration)
 	mux.HandleFunc("GET /dashboard/api/users", s.handleDashboardUsers)
 	mux.HandleFunc("DELETE /dashboard/api/users/{id}", s.handleDashboardDeleteUser)
 	mux.HandleFunc("POST /dashboard/api/users/{id}/disable", s.handleDashboardDisableUser)
 	mux.HandleFunc("POST /dashboard/api/users/{id}/enable", s.handleDashboardEnableUser)
+	mux.HandleFunc("POST /dashboard/api/users/{id}/mfa/reset", s.handleDashboardResetUserMFA)
 	mux.HandleFunc("POST /dashboard/api/users/{id}/resend-verification", s.handleDashboardResendUserVerification)
 	mux.HandleFunc("GET /dashboard/api/sessions", s.handleDashboardSessions)
 	mux.HandleFunc("POST /dashboard/api/sessions/{id}/revoke", s.handleDashboardRevokeSession)
@@ -325,6 +358,10 @@ func withDashboardCORS(origin string, next http.Handler) http.Handler {
 		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		// Every dashboard write needs the double-submit CSRF token.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !accountCSRFValid(w, r) {
 			return
 		}
 		next.ServeHTTP(w, r)

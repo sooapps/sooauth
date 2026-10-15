@@ -103,7 +103,9 @@ func (s *Server) tenantFromReturnTo(ctx context.Context, returnTo string) *uuid.
 }
 
 func (s *Server) handlePageSignIn(w http.ResponseWriter, r *http.Request) {
-	if user, _ := s.currentUser(r); user != nil {
+	// A signed-in dashboard owner only skips the page for dashboard sign-in;
+	// project sign-in (client_id present) must always show the form.
+	if user, _ := s.currentUser(r); user != nil && !s.isProjectSignIn(r) {
 		if ok, _ := s.users.IsPlatformOwner(r.Context(), user.ID); ok {
 			http.Redirect(w, r, "/dashboard/", http.StatusFound)
 			return
@@ -113,13 +115,23 @@ func (s *Server) handlePageSignIn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePageSignUp(w http.ResponseWriter, r *http.Request) {
-	if user, _ := s.currentUser(r); user != nil {
+	// A signed-in dashboard owner only skips the page for dashboard sign-in;
+	// project sign-in (client_id present) must always show the form.
+	if user, _ := s.currentUser(r); user != nil && !s.isProjectSignIn(r) {
 		if ok, _ := s.users.IsPlatformOwner(r.Context(), user.ID); ok {
 			http.Redirect(w, r, "/dashboard/", http.StatusFound)
 			return
 		}
 	}
 	s.pages.Render(w, "sign-up-content", s.pageData("title.sign_up", r))
+}
+
+func (s *Server) isProjectSignIn(r *http.Request) bool {
+	clientID := strings.TrimSpace(r.URL.Query().Get("client_id"))
+	if clientID == "" {
+		clientID = clientIDFromReturnTo(r.URL.Query().Get("return_to"))
+	}
+	return clientID != "" && s.tenantFromClientID(r.Context(), clientID) != nil
 }
 
 func (s *Server) handlePageForgotPassword(w http.ResponseWriter, r *http.Request) {

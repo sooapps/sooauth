@@ -34,6 +34,16 @@
     document.dispatchEvent(new CustomEvent(name, { detail: detail, bubbles: true }));
   }
 
+  function postJSON(url, body) {
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Sooauth-Embed": "1" },
+      body: JSON.stringify(body),
+    })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+      .catch(function () { return { ok: false, d: { message: "Network error. Please try again." } }; });
+  }
+
   function stripQuery(keys) {
     var url = new URL(window.location.href);
     keys.forEach(function (k) { url.searchParams.delete(k); });
@@ -129,6 +139,23 @@
   var currentMode = mode;
   var lastEmail = "";
   var lastIdentifier = "";
+  // "both" mode: the user may switch between password and one-time code.
+  var preferCode = false;
+  // Two-step verification state after a password sign-in.
+  var mfa = { challenge: "", method: "", methods: [], setup: null, backupCodes: null };
+
+  function linkBtn(id, label) {
+    return '<button id="' + id + '" type="button" style="background:none;border:none;padding:0;color:#5D6B70;cursor:pointer;text-decoration:underline;font-size:13px">' + label + '</button>';
+  }
+
+  function loginDone(d) {
+    dispatch("sooauth:login", {
+      access_token: d.access_token,
+      refresh_token: d.refresh_token,
+      email: d.email,
+      expires_in: d.expires_in,
+    });
+  }
 
   function render(cfg, base) {
     var accent = cfg.accent_color || "#FF3B3B";
@@ -137,7 +164,10 @@
     var authCfg = cfg.auth_config || { allowed_identifiers: ["email"], primary_auth_mode: "password" };
     var allowedIds = authCfg.allowed_identifiers || ["email"];
     var isOTPMode = authCfg.primary_auth_mode === "otp";
+    var isBothMode = authCfg.primary_auth_mode === "both";
+    var useCodeForm = isOTPMode || (isBothMode && preferCode);
     var idInfo = getIdentifierInfo(authCfg);
+    var codeInput = '<input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required placeholder="6-digit code" style="padding:10px;border:1px solid #C4C4C4;border-radius:8px;color:#051B23;font-family:monospace;letter-spacing:0.2em;text-align:center" />';
 
     var html = '<div class="sooauth-widget" style="font-family:system-ui,sans-serif;max-width:400px">';
 
@@ -169,6 +199,37 @@
         '<button id="sooauth-back-btn" type="button" style="background:none;border:none;padding:0;color:#051B23;cursor:pointer;text-decoration:underline">Back to sign in</button>' +
         '</div>' +
         '<p id="sooauth-msg" style="font-size:13px;color:#051B23;margin:10px 0 0"></p>';
+    } else if (currentMode === "mfa") {
+      var mfaTitle = mfa.method === "totp_setup" ? "Set up two-step verification" : "Two-step verification";
+      var mfaLead = mfa.method === "email_otp"
+        ? "Enter the 6-digit code we emailed you."
+        : mfa.method === "totp_setup"
+          ? "Scan this QR code with an authenticator app (Google Authenticator, 1Password, Authy), then enter the 6-digit code."
+          : "Enter the 6-digit code from your authenticator app, or a backup code.";
+      html += '<p style="margin:0 0 6px;font-size:16px;font-weight:600;color:#051B23">' + mfaTitle + '</p>' +
+        '<p style="margin:0 0 14px;font-size:13px;color:#5D6B70">' + mfaLead + '</p>';
+      if (mfa.method === "totp_setup") {
+        if (mfa.setup) {
+          html += (mfa.setup.qr_code ? '<img src="' + escapeHtml(mfa.setup.qr_code) + '" alt="QR code" width="180" height="180" style="display:block;margin:0 auto 10px" />' : '') +
+            '<p style="margin:0 0 12px;font-size:12px;color:#5D6B70;text-align:center;word-break:break-all">Or enter this key: <code>' + escapeHtml(mfa.setup.secret || "") + '</code></p>';
+        } else {
+          html += '<p style="font-size:13px;color:#5D6B70">Loading QR code…</p>';
+        }
+      }
+      html += '<form id="sooauth-mfa-form" style="display:grid;gap:10px">' + codeInput +
+        '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid ' + accent + ';border-radius:8px;background:' + accent + ';color:' + accentFg + ';font-weight:600;cursor:pointer">Verify</button>' +
+        '</form>' +
+        '<div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px">' +
+        linkBtn("sooauth-back-btn", "Back to sign in") +
+        (mfa.method === "email_otp" ? linkBtn("sooauth-mfa-resend", "Resend code") :
+          (mfa.method === "totp" && mfa.methods.indexOf("email_otp") !== -1 ? linkBtn("sooauth-mfa-email", "Email me a code instead") : "")) +
+        '</div>' +
+        '<p id="sooauth-msg" style="font-size:13px;color:#051B23;margin:10px 0 0"></p>';
+    } else if (currentMode === "backup_codes") {
+      html += '<p style="margin:0 0 6px;font-size:16px;font-weight:600;color:#051B23">Save your backup codes</p>' +
+        '<p style="margin:0 0 12px;font-size:13px;color:#5D6B70">Each code works once if you lose your phone. Store them somewhere safe.</p>' +
+        '<pre style="margin:0 0 12px;padding:12px;border:1px solid #C4C4C4;border-radius:8px;font-size:13px;line-height:1.7;color:#051B23;columns:2">' + (mfa.backupCodes || []).map(escapeHtml).join("\n") + '</pre>' +
+        '<p style="font-size:13px;color:#051B23;margin:0">You are signed in.</p>';
     } else if (currentMode === "otp_verify") {
       html += '<p style="margin:0 0 6px;font-size:16px;font-weight:600;color:#051B23">Enter verification code</p>' +
         '<p style="margin:0 0 14px;font-size:13px;color:#5D6B70">Enter the 6-digit code sent to <strong>' + escapeHtml(lastIdentifier) + '</strong>.</p>' +
@@ -273,10 +334,11 @@
             '<p id="sooauth-msg" style="font-size:13px;color:#051B23;margin:8px 0 0"></p>';
         } else {
           // --- SIGN IN FORM ---
-          if (isOTPMode) {
+          if (useCodeForm) {
             html += '<form id="sooauth-otp-send-form" style="display:grid;gap:10px">' +
               '<input name="identifier" type="' + idInfo.type + '" required placeholder="' + escapeHtml(idInfo.placeholder) + '" value="' + escapeHtml(lastIdentifier || lastEmail) + '" style="padding:10px;border:1px solid #C4C4C4;border-radius:8px;color:#051B23" />' +
               '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid ' + accent + ';border-radius:8px;background:' + accent + ';color:' + accentFg + ';font-weight:600;cursor:pointer">Send verification code</button></form>' +
+              (isBothMode ? '<div style="margin-top:12px;text-align:center">' + linkBtn("sooauth-use-password", "Use my password instead") + '</div>' : '') +
               '<div style="margin-top:14px;text-align:center;font-size:13px">' +
               '<button id="sooauth-toggle-mode" type="button" style="background:none;border:none;padding:0;color:#5D6B70;cursor:pointer;text-decoration:underline">Don\'t have an account? Sign up</button>' +
               '</div>' +
@@ -293,6 +355,7 @@
               '</div>' +
               (showRememberMe ? '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#051B23;cursor:pointer;user-select:none"><input type="checkbox" name="remember_me" value="true"' + (rememberMeChecked ? " checked" : "") + ' style="width:16px;height:16px;margin:0;cursor:pointer" /><span>Remember me</span></label>' : '') +
               '<button id="sooauth-submit" type="submit" style="padding:12px;border:1px solid ' + accent + ';border-radius:8px;background:' + accent + ';color:' + accentFg + ';font-weight:600;cursor:pointer">Sign in</button></form>' +
+              (isBothMode ? '<div style="margin-top:12px;text-align:center">' + linkBtn("sooauth-use-code", "Use a one-time code instead") + '</div>' : '') +
               '<div style="margin-top:14px;text-align:center;font-size:13px">' +
               '<button id="sooauth-toggle-mode" type="button" style="background:none;border:none;padding:0;color:#5D6B70;cursor:pointer;text-decoration:underline">Don\'t have an account? Sign up</button>' +
               '</div>' +
@@ -336,6 +399,60 @@
         currentMode = "signin";
         render(cfg, base);
       };
+    }
+
+    var useCodeBtn = document.getElementById("sooauth-use-code");
+    if (useCodeBtn) useCodeBtn.onclick = function () { preferCode = true; render(cfg, base); };
+    var usePwBtn = document.getElementById("sooauth-use-password");
+    if (usePwBtn) usePwBtn.onclick = function () { preferCode = false; render(cfg, base); };
+
+    var mfaEmailBtn = document.getElementById("sooauth-mfa-email");
+    var mfaResendBtn = document.getElementById("sooauth-mfa-resend");
+    [mfaEmailBtn, mfaResendBtn].forEach(function (btn) {
+      if (!btn) return;
+      btn.onclick = function () {
+        var msg = document.getElementById("sooauth-msg");
+        msg.textContent = "Sending code…";
+        postJSON(base + "/auth/mfa/resend", { challenge: mfa.challenge }).then(function (res) {
+          if (!res.ok) { msg.textContent = res.d.message || res.d.error || "Could not send code"; return; }
+          mfa.method = "email_otp";
+          render(cfg, base);
+          var m = document.getElementById("sooauth-msg");
+          if (m) m.textContent = "Code sent.";
+        });
+      };
+    });
+
+    if (currentMode === "mfa" && mfa.method === "totp_setup" && !mfa.setup) {
+      postJSON(base + "/auth/mfa/setup", { challenge: mfa.challenge }).then(function (res) {
+        if (res.ok) { mfa.setup = res.d; render(cfg, base); }
+        else { var m = document.getElementById("sooauth-msg"); if (m) m.textContent = res.d.message || res.d.error || "Could not start setup"; }
+      });
+    }
+
+    var mfaForm = document.getElementById("sooauth-mfa-form");
+    if (mfaForm) {
+      mfaForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var code = String(new FormData(mfaForm).get("code") || "").trim();
+        var msg = document.getElementById("sooauth-msg");
+        msg.textContent = "Verifying…";
+        postJSON(base + "/auth/mfa/verify", { challenge: mfa.challenge, code: code, method: mfa.method }).then(function (res) {
+          if (!res.ok) {
+            msg.textContent = res.d.error === "too_many_attempts" ? "Too many attempts. Sign in again." : (res.d.message || "Invalid code");
+            return;
+          }
+          loginDone(res.d);
+          if (res.d.backup_codes && res.d.backup_codes.length) {
+            mfa.backupCodes = res.d.backup_codes;
+            currentMode = "backup_codes";
+            render(cfg, base);
+            return;
+          }
+          msg.textContent = "Signed in.";
+        });
+      });
+      return;
     }
 
     var toggleBtn = document.getElementById("sooauth-toggle-mode");
@@ -545,14 +662,19 @@
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
             if (!res.ok) {
-              msg.textContent = res.d.message || res.d.error || "Invalid code";
+              if (res.d.error === "registration_required") {
+                // New user: collect the required sign-up fields, then a new code.
+                lastEmail = lastIdentifier.indexOf("@") !== -1 ? lastIdentifier : lastEmail;
+                currentMode = "signup";
+                render(cfg, base);
+                var m = document.getElementById("sooauth-msg");
+                if (m) m.textContent = "Almost there — complete your details to create the account.";
+                return;
+              }
+              msg.textContent = res.d.error === "too_many_attempts" ? "Too many wrong codes. Request a new code." : (res.d.message || res.d.error || "Invalid code");
               return;
             }
-            dispatch("sooauth:login", {
-              access_token: res.d.access_token,
-              email: res.d.email,
-              expires_in: res.d.expires_in,
-            });
+            loginDone(res.d);
             msg.textContent = "Signed in.";
           })
           .catch(function () {
@@ -678,16 +800,18 @@
       })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
         .then(function (res) {
-          if (!res.ok) {
-            msg.style.color = "#051B23";
-            msg.textContent = res.d.message || res.d.error || "Request failed";
+          if (!res.ok && res.d.error === "mfa_required") {
+            mfa = { challenge: res.d.challenge, method: res.d.method || "totp", methods: res.d.methods || [], setup: null, backupCodes: null };
+            currentMode = "mfa";
+            render(cfg, base);
             return;
           }
-          dispatch("sooauth:login", {
-            access_token: res.d.access_token,
-            email: res.d.email,
-            expires_in: res.d.expires_in,
-          });
+          if (!res.ok) {
+            msg.style.color = "#051B23";
+            msg.textContent = res.d.error === "password_login_disabled" ? "This app signs in with one-time codes." : (res.d.message || res.d.error || "Request failed");
+            return;
+          }
+          loginDone(res.d);
           msg.style.color = "#051B23";
           msg.textContent = "Signed in.";
         })

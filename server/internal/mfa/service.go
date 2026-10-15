@@ -34,16 +34,22 @@ type Service struct{ records *store.MFA }
 func NewService(records *store.MFA) *Service { return &Service{records: records} }
 
 func (s *Service) Start(ctx context.Context, user *store.User) (*Setup, error) {
-	if _, enabled, err := s.records.Secret(ctx, user.ID); err != nil {
+	return s.StartFor(ctx, user.ID, "sooauth", user.Email)
+}
+
+// StartFor creates a pending TOTP secret for userID. issuer is the name shown in
+// the authenticator app (the project's brand for end users).
+func (s *Service) StartFor(ctx context.Context, userID uuid.UUID, issuer, account string) (*Setup, error) {
+	if _, enabled, err := s.records.Secret(ctx, userID); err != nil {
 		return nil, err
 	} else if enabled {
 		return nil, ErrAlreadyEnable
 	}
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "sooauth", AccountName: user.Email, Period: 30, Digits: otp.DigitsSix, Algorithm: otp.AlgorithmSHA1})
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: issuer, AccountName: account, Period: 30, Digits: otp.DigitsSix, Algorithm: otp.AlgorithmSHA1})
 	if err != nil {
 		return nil, err
 	}
-	if err := s.records.PendingSecret(ctx, user.ID, key.Secret()); err != nil {
+	if err := s.records.PendingSecret(ctx, userID, key.Secret()); err != nil {
 		return nil, err
 	}
 	return &Setup{Secret: key.Secret(), URL: key.URL()}, nil
@@ -67,7 +73,13 @@ func (s *Service) PendingURL(ctx context.Context, user *store.User) (string, err
 }
 
 func (s *Service) Confirm(ctx context.Context, user *store.User, code string) ([]string, error) {
-	secret, enabled, err := s.records.Secret(ctx, user.ID)
+	return s.ConfirmFor(ctx, user.ID, code)
+}
+
+// ConfirmFor enables a pending TOTP secret once code matches it and returns
+// fresh backup codes.
+func (s *Service) ConfirmFor(ctx context.Context, userID uuid.UUID, code string) ([]string, error) {
+	secret, enabled, err := s.records.Secret(ctx, userID)
 	if err != nil || secret == "" || enabled || !validCode(secret, code) {
 		return nil, ErrInvalidCode
 	}
@@ -75,10 +87,10 @@ func (s *Service) Confirm(ctx context.Context, user *store.User, code string) ([
 	if err != nil {
 		return nil, err
 	}
-	if err := s.records.ReplaceBackupCodes(ctx, user.ID, hashes); err != nil {
+	if err := s.records.ReplaceBackupCodes(ctx, userID, hashes); err != nil {
 		return nil, err
 	}
-	if err := s.records.Enable(ctx, user.ID); err != nil {
+	if err := s.records.Enable(ctx, userID); err != nil {
 		return nil, err
 	}
 	return codes, nil
@@ -152,4 +164,49 @@ func backupCodes() ([]string, []string, error) {
 		hashes[i] = token.Hash(codes[i])
 	}
 	return codes, hashes, nil
+}
+
+// HasPending reports whether userID started TOTP setup without confirming it.
+func (s *Service) HasPending(ctx context.Context, userID uuid.UUID) (bool, error) {
+	secret, enabled, err := s.records.Secret(ctx, userID)
+	return secret != "" && !enabled, err
+}
+
+// CheckCode accepts a current TOTP code or an unused backup code for an
+// enrolled user. A backup code is consumed.
+func (s *Service) CheckCode(ctx context.Context, userID uuid.UUID, code string) bool {
+	secret, enabled, err := s.records.Secret(ctx, userID)
+	if err != nil || !enabled {
+		return false
+	}
+	if validCode(secret, code) {
+		return true
+	}
+	used, err := s.records.ConsumeBackupCode(ctx, userID, token.Hash(strings.ToUpper(strings.TrimSpace(code))))
+	return err == nil && used
+}
+
+// ChallengeOwner returns the user behind an open challenge without using it.
+func (s *Service) ChallengeOwner(ctx context.Context, challenge string) (uuid.UUID, error) {
+	userID, err := s.records.ChallengeUser(ctx, token.Hash(challenge))
+	if err != nil {
+		return uuid.Nil, ErrInvalidCode
+	}
+	return userID, nil
+}
+
+// UseChallenge marks a challenge as used after the second factor succeeded.
+func (s *Service) UseChallenge(ctx context.Context, challenge string, userID uuid.UUID) error {
+	_, err := s.consumeVerifiedChallenge(ctx, token.Hash(challenge), userID)
+	return err
+}
+
+// Reset removes a user's TOTP secret and backup codes (admin reset).
+func (s *Service) Reset(ctx context.Context, userID uuid.UUID) error {
+	return s.records.Disable(ctx, userID)
+}
+
+// EnabledAmong returns which of userIDs have TOTP enabled.
+func (s *Service) EnabledAmong(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	return s.records.EnabledAmong(ctx, userIDs)
 }

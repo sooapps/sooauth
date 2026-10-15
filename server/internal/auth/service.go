@@ -34,7 +34,14 @@ var (
 	ErrUserDisabled       = errors.New("user disabled")
 )
 
-type MFARequiredError struct{ Challenge string }
+type MFARequiredError struct {
+	Challenge string
+	// Method is the second step the client should show: "totp", "email_otp"
+	// or "totp_setup" (the user must enroll an authenticator app first).
+	Method string
+	// Methods lists every method the user may switch to for this challenge.
+	Methods []string
+}
 
 func (e *MFARequiredError) Error() string { return "mfa required" }
 
@@ -47,6 +54,9 @@ const (
 
 type SignInOptions struct {
 	RememberMe bool
+	// Gate runs after the password matched and before tokens are issued. It can
+	// stop the sign-in, e.g. with *MFARequiredError for a second step.
+	Gate func(ctx context.Context, user *store.User) error
 }
 
 type TokenBundle struct {
@@ -272,6 +282,11 @@ func (s *Service) SignInAppByIdentifierWithOptions(ctx context.Context, tenantID
 	if found.DisabledAt != nil {
 		return nil, ErrUserDisabled
 	}
+	if opts.Gate != nil {
+		if err := opts.Gate(ctx, found); err != nil {
+			return nil, err
+		}
+	}
 
 	return s.completeSignIn(ctx, found, ip, userAgent, "signin", opts.RememberMe)
 }
@@ -454,6 +469,10 @@ func (s *Service) Refresh(ctx context.Context, plainRefresh, ip string) (*TokenB
 	user, err := s.users.FindByID(ctx, rt.UserID)
 	if err != nil || user == nil {
 		return nil, ErrInvalidToken
+	}
+	if user.DisabledAt != nil {
+		_ = s.refresh.RevokeFamily(ctx, rt.FamilyID)
+		return nil, ErrUserDisabled
 	}
 
 	newPlain, newHash, err := token.Generate()
@@ -754,7 +773,7 @@ func (s *Service) SessionUser(ctx context.Context, sessionToken string) (*store.
 	if err != nil || sess == nil {
 		return nil, err
 	}
-	return s.users.FindByID(ctx, sess.UserID)
+	return activeUser(s.users.FindByID(ctx, sess.UserID))
 }
 
 func (s *Service) UserFromAccess(ctx context.Context, accessToken string) (*store.User, error) {
@@ -769,7 +788,19 @@ func (s *Service) UserFromAccess(ctx context.Context, accessToken string) (*stor
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	return s.users.FindByID(ctx, userID)
+	return activeUser(s.users.FindByID(ctx, userID))
+}
+
+// activeUser rejects disabled accounts so existing sessions and access tokens
+// stop working as soon as a user is disabled.
+func activeUser(user *store.User, err error) (*store.User, error) {
+	if err != nil || user == nil {
+		return user, err
+	}
+	if user.DisabledAt != nil {
+		return nil, ErrUserDisabled
+	}
+	return user, nil
 }
 
 func randomToken(n int) (string, error) {
@@ -785,4 +816,10 @@ func trimSlash(u string) string {
 		u = u[:len(u)-1]
 	}
 	return u
+}
+
+// CompleteSignIn issues tokens for an already-authenticated user (for example
+// after a one-time code or a second factor) and records auditAction.
+func (s *Service) CompleteSignIn(ctx context.Context, user *store.User, ip, userAgent, auditAction string, rememberMe bool) (*TokenBundle, error) {
+	return s.completeSignIn(ctx, user, ip, userAgent, auditAction, rememberMe)
 }

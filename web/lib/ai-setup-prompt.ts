@@ -69,6 +69,9 @@ export function buildAiCustomAuthPrompt(opts?: {
    - After redirect, URL has \`?widget_code=…\` → \`POST ${issuer}/v1/widget/exchange\` \`{ code, client_id }\` → access_token
 7. Add exact \`return_to\` / callback hosts in dashboard → Integration redirect URIs (include app \`/login\` and \`/register\` for email verify + social, not only OIDC callback).
 8. Do NOT put Google/GitHub OAuth secrets in my app — only in sooauth dashboard → Social login.
+9. **Sign-in mode** — read \`auth_config.primary_auth_mode\` from the config: \`password\`, \`otp\` (codes only) or \`both\` (show a "use a one-time code" switch). Codes: \`POST ${issuer}/auth/otp/send\` \`{ identifier, client_id }\` then \`POST ${issuer}/auth/otp/verify\` \`{ identifier, code, client_id, metadata? }\`; a 422 \`registration_required\` lists sign-up fields a new user must send.
+10. **Two-step verification** — sign-in can return 401 \`{ error: "mfa_required", challenge, method }\` (\`totp\`, \`email_otp\` or \`totp_setup\`). Ask for the code and \`POST ${issuer}/auth/mfa/verify\` \`{ challenge, code, method }\`; for \`totp_setup\` first \`POST ${issuer}/auth/mfa/setup\` \`{ challenge }\` and show the returned \`qr_code\`.
+11. **Sign-up fields** — render \`registration_schema\` and send values as \`metadata\` on sign-up; read them back from \`custom_claims\` on /oauth/userinfo.
 
 ## UI requirements
 - Fetch widget config server-side or via my API proxy (cache: no-store).

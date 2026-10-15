@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -234,7 +233,10 @@ func (s *Server) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": msg})
 }
 
-func (s *Server) signInAppUser(ctx context.Context, clientID, identifier, password, ip, userAgent string, rememberMe bool) (*auth.TokenBundle, error) {
+var errPasswordLoginDisabled = errors.New("password_login_disabled")
+
+func (s *Server) signInAppUser(r *http.Request, clientID, identifier, password, ip, userAgent string, rememberMe bool) (*auth.TokenBundle, error) {
+	ctx := r.Context()
 	client, err := s.oauthClients.FindByClientID(ctx, clientID)
 	if err != nil || client == nil || client.TenantID == nil {
 		return nil, store.ErrInvalidClient
@@ -245,8 +247,17 @@ func (s *Server) signInAppUser(ctx context.Context, clientID, identifier, passwo
 	if err != nil || tenant == nil {
 		return nil, store.ErrInvalidClient
 	}
+	if !tenant.AuthConfig.AllowsPassword() {
+		return nil, errPasswordLoginDisabled
+	}
+	if !tenant.AuthConfig.AllowsIdentifier(store.IdentifierKind(identifier)) {
+		return nil, auth.ErrInvalidCredentials
+	}
 
-	return s.auth.SignInAppByIdentifierWithOptions(ctx, tenantID, identifier, password, ip, userAgent, tenant.EmailVerifyRequired, auth.SignInOptions{RememberMe: rememberMe})
+	return s.auth.SignInAppByIdentifierWithOptions(ctx, tenantID, identifier, password, ip, userAgent, tenant.EmailVerifyRequired, auth.SignInOptions{
+		RememberMe: rememberMe,
+		Gate:       s.appMFAGate(r, tenant, client),
+	})
 }
 
 func (s *Server) handleWidgetConfig(w http.ResponseWriter, r *http.Request) {
@@ -405,152 +416,6 @@ func (s *Server) handleWidgetFieldOptions(w http.ResponseWriter, r *http.Request
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"options": options,
-	})
-}
-
-type otpPayload struct {
-	Code       string `json:"code"`
-	Identifier string `json:"identifier"`
-	ClientID   string `json:"client_id"`
-}
-
-func (s *Server) handleSendOTP(w http.ResponseWriter, r *http.Request) {
-	setPublicCORS(w, r)
-	if corsPreflight(w, r) {
-		return
-	}
-
-	var body struct {
-		ClientID   string `json:"client_id"`
-		Identifier string `json:"identifier"`
-		Channel    string `json:"channel"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
-		return
-	}
-
-	clientID := strings.TrimSpace(body.ClientID)
-	identifier := strings.TrimSpace(body.Identifier)
-	if clientID == "" || identifier == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "client_id_and_identifier_required"})
-		return
-	}
-
-	client, err := s.oauthClients.FindByClientID(r.Context(), clientID)
-	if err != nil || client == nil || client.TenantID == nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "client_not_found"})
-		return
-	}
-	tenantID := *client.TenantID
-
-	code := fmt.Sprintf("%06d", (time.Now().UnixNano()%900000)+100000)
-
-	cacheKey := fmt.Sprintf("otp:%s:%s", tenantID.String(), identifier)
-	if s.ephemeral == nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ephemeral_store_not_configured"})
-		return
-	}
-	if err := s.ephemeral.Set(r.Context(), cacheKey, otpPayload{
-		Code:       code,
-		Identifier: identifier,
-		ClientID:   clientID,
-	}, 5*time.Minute); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed_to_store_otp"})
-		return
-	}
-
-	if s.webhooks != nil {
-		s.webhooks.Emit(r.Context(), &tenantID, "otp.sent", nil, map[string]any{
-			"identifier": identifier,
-			"channel":    body.Channel,
-			"ip":         clientIP(r),
-		})
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{
-		"message": "Verification code sent.",
-	})
-}
-
-func (s *Server) handleVerifyOTP(w http.ResponseWriter, r *http.Request) {
-	setPublicCORS(w, r)
-	if corsPreflight(w, r) {
-		return
-	}
-
-	var body struct {
-		ClientID   string `json:"client_id"`
-		Identifier string `json:"identifier"`
-		Code       string `json:"code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
-		return
-	}
-
-	clientID := strings.TrimSpace(body.ClientID)
-	identifier := strings.TrimSpace(body.Identifier)
-	code := strings.TrimSpace(body.Code)
-	if clientID == "" || identifier == "" || code == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing_parameters"})
-		return
-	}
-
-	client, err := s.oauthClients.FindByClientID(r.Context(), clientID)
-	if err != nil || client == nil || client.TenantID == nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "client_not_found"})
-		return
-	}
-	tenantID := *client.TenantID
-
-	if s.ephemeral == nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ephemeral_store_not_configured"})
-		return
-	}
-	cacheKey := fmt.Sprintf("otp:%s:%s", tenantID.String(), identifier)
-	var payload otpPayload
-	ok, err := s.ephemeral.Get(r.Context(), cacheKey, &payload)
-	if err != nil || !ok || payload.Code != code {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_code"})
-		return
-	}
-	_ = s.ephemeral.Delete(r.Context(), cacheKey)
-
-	user, err := s.users.FindAppUserByIdentifierSimple(r.Context(), tenantID, identifier)
-	if err != nil || user == nil {
-		var email, username, phone string
-		if strings.Contains(identifier, "@") {
-			email = identifier
-		} else if strings.HasPrefix(identifier, "+") || (len(identifier) >= 7 && !strings.ContainsAny(identifier, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")) {
-			phone = identifier
-		} else {
-			username = identifier
-		}
-		user, err = s.users.CreateAppUserFlexible(r.Context(), tenantID, email, username, phone, "", nil)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "failed_to_create_user"})
-			return
-		}
-	}
-
-	if user.Phone != nil && *user.Phone == identifier {
-		_ = s.users.MarkPhoneVerified(r.Context(), user.ID)
-	} else if user.Email == identifier {
-		_ = s.users.MarkEmailVerified(r.Context(), user.ID)
-	}
-
-	bundle, err := s.auth.SignInVerifiedUser(r.Context(), user, clientIP(r), r.UserAgent())
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "signin_failed"})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"message":      "Signed in successfully.",
-		"access_token": bundle.AccessToken,
-		"email":        bundle.User.Email,
-		"expires_in":   bundle.ExpiresIn,
 	})
 }
 

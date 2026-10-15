@@ -157,14 +157,6 @@ func (s *Users) ListAppEndUsersByTenant(ctx context.Context, tenantID, ownerUser
 	return out, rows.Err()
 }
 
-func (s *Users) EnsureTenant(ctx context.Context, userID, tenantID uuid.UUID) error {
-	_, err := s.db.Exec(ctx, `
-		UPDATE users SET tenant_id = $2, updated_at = now()
-		WHERE id = $1 AND (tenant_id IS NULL OR tenant_id = $2)
-	`, userID, tenantID)
-	return err
-}
-
 type SessionRow struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
@@ -202,7 +194,10 @@ func (s *Sessions) ListActive(ctx context.Context, limit int) ([]SessionRow, err
 	return out, rows.Err()
 }
 
-func (s *Sessions) ListActiveByTenant(ctx context.Context, tenantID, ownerID uuid.UUID, limit int) ([]SessionRow, error) {
+// ListActiveByTenant lists sessions of the project's end users only. Dashboard
+// (platform) sessions are never listed here, so revoking from a project cannot
+// sign the owner out of the dashboard.
+func (s *Sessions) ListActiveByTenant(ctx context.Context, tenantID uuid.UUID, limit int) ([]SessionRow, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -211,10 +206,10 @@ func (s *Sessions) ListActiveByTenant(ctx context.Context, tenantID, ownerID uui
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.revoked_at IS NULL AND s.expires_at > now()
-		  AND (u.tenant_id = $1 OR u.id = $2)
+		  AND u.tenant_id = $1 AND NOT u.platform_owner
 		ORDER BY s.created_at DESC
-		LIMIT $3
-	`, tenantID, ownerID, limit)
+		LIMIT $2
+	`, tenantID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -230,13 +225,13 @@ func (s *Sessions) ListActiveByTenant(ctx context.Context, tenantID, ownerID uui
 	return out, rows.Err()
 }
 
-func (s *Sessions) RevokeByIDForTenant(ctx context.Context, id, tenantID, ownerID uuid.UUID) (bool, error) {
+func (s *Sessions) RevokeByIDForTenant(ctx context.Context, id, tenantID uuid.UUID) (bool, error) {
 	tag, err := s.db.Exec(ctx, `
 		UPDATE sessions s SET revoked_at = now()
 		FROM users u
 		WHERE s.id = $1 AND s.user_id = u.id AND s.revoked_at IS NULL
-		  AND (u.tenant_id = $2 OR u.id = $3)
-	`, id, tenantID, ownerID)
+		  AND u.tenant_id = $2 AND NOT u.platform_owner
+	`, id, tenantID)
 	if err != nil {
 		return false, err
 	}

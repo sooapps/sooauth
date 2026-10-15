@@ -24,6 +24,10 @@ const (
 	refreshCookie = "sooauth_refresh"
 	csrfCookie    = "sooauth_csrf"
 	csrfHeader    = "X-CSRF-Token"
+	// appSessionCookie holds the hosted-page session of a project end user. It
+	// is kept apart from sessionCookie (dashboard / platform accounts) so signing
+	// in to a project app never replaces or reuses the dashboard session.
+	appSessionCookie = "sooauth_app_session"
 )
 
 func (s *Server) handleSignUp(w http.ResponseWriter, r *http.Request) {
@@ -222,6 +226,10 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		Password   string `json:"password"`
 		ClientID   string `json:"client_id"`
 		RememberMe *bool  `json:"remember_me"`
+		// Hosted is set by the hosted sign-in page so the project session is
+		// kept in the app cookie for /oauth/authorize. API callers omit it and
+		// only receive tokens in the response body.
+		Hosted bool `json:"hosted"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
@@ -241,12 +249,16 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	var bundle *auth.TokenBundle
 	var err error
 	if strings.TrimSpace(body.ClientID) != "" {
-		bundle, err = s.signInAppUser(r.Context(), body.ClientID, identifier, body.Password, clientIP(r), r.UserAgent(), rememberMe)
+		bundle, err = s.signInAppUser(r, body.ClientID, identifier, body.Password, clientIP(r), r.UserAgent(), rememberMe)
 	} else {
 		bundle, err = s.auth.SignInWithOptions(r.Context(), identifier, body.Password, clientIP(r), r.UserAgent(), auth.SignInOptions{RememberMe: rememberMe})
 	}
 	if err == auth.ErrRateLimited {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
+		return
+	}
+	if errors.Is(err, errPasswordLoginDisabled) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "password_login_disabled", "message": "This project signs in with one-time codes only."})
 		return
 	}
 	if err == auth.ErrEmailNotVerified {
@@ -263,10 +275,11 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 	var mfaErr *auth.MFARequiredError
 	if errors.As(err, &mfaErr) {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{
-			"error":     "mfa_required",
-			"challenge": mfaErr.Challenge,
-		})
+		writeJSON(w, http.StatusUnauthorized, mfaRequiredBody(mfaErr))
+		return
+	}
+	if errors.Is(err, auth.ErrEmailDelivery) {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "otp_delivery_failed"})
 		return
 	}
 	if err != nil {
@@ -276,6 +289,8 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 
 	if body.ClientID == "" {
 		setAuthCookies(w, s.cfg.CookieSecure, s.cfg.CookieDomain, bundle)
+	} else if body.Hosted {
+		setAppSessionCookie(w, s.cfg.CookieSecure, s.cfg.CookieDomain, bundle)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":            bundle.User.ID,
@@ -352,12 +367,19 @@ func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMFAVerify(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Challenge string `json:"challenge"`
-		Code      string `json:"code"`
+	setPublicCORS(w, r)
+	if corsPreflight(w, r) {
+		return
 	}
+	var body appMFAVerifyBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	// Project end users finish their own second step; dashboard accounts keep
+	// the platform TOTP flow below.
+	if user, tenant, _, err := s.appChallengeUser(r.Context(), body.Challenge); err == nil && tenant != nil {
+		s.handleAppMFAVerify(w, r, body, user, tenant)
 		return
 	}
 	bundle, err := s.auth.VerifyMFA(r.Context(), body.Challenge, body.Code, clientIP(r), r.UserAgent())
@@ -369,7 +391,7 @@ func (s *Server) handleMFAVerify(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "mfa_verification_failed"})
 		return
 	}
-	setAuthCookies(w, s.cfg.CookieSecure, s.cfg.CookieDomain, bundle)
+	s.setSessionCookiesFor(w, r, bundle)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": bundle.User.ID, "email": bundle.User.Email, "access_token": bundle.AccessToken,
 		"refresh_token": bundle.RefreshToken, "expires_in": bundle.ExpiresIn, "csrf_token": bundle.CSRFToken, "token_type": "Bearer",
@@ -605,6 +627,49 @@ func (s *Server) currentUser(r *http.Request) (*store.User, error) {
 		return nil, nil
 	}
 	return s.auth.SessionUser(r.Context(), cookie.Value)
+}
+
+// appSessionUser returns the project end user signed in on the hosted pages.
+func (s *Server) appSessionUser(r *http.Request) *store.User {
+	cookie, err := r.Cookie(appSessionCookie)
+	if err != nil || cookie.Value == "" {
+		return nil
+	}
+	user, err := s.auth.SessionUser(r.Context(), cookie.Value)
+	if err != nil || user == nil || user.TenantID == nil {
+		return nil
+	}
+	return user
+}
+
+func setAppSessionCookie(w http.ResponseWriter, secure bool, domain string, bundle *auth.TokenBundle) {
+	maxAge := 0
+	if bundle.RememberMe {
+		maxAge = int((30 * 24 * time.Hour).Seconds())
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     appSessionCookie,
+		Value:    bundle.SessionToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		Domain:   domain,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   maxAge,
+	})
+}
+
+// setSessionCookiesFor picks the cookie jar for the signed-in user: platform
+// accounts get the dashboard cookies, project end users get the app cookie.
+func (s *Server) setSessionCookiesFor(w http.ResponseWriter, r *http.Request, bundle *auth.TokenBundle) {
+	if bundle == nil || bundle.User == nil {
+		return
+	}
+	if platform, _ := s.users.IsPlatformOwner(r.Context(), bundle.User.ID); platform {
+		setAuthCookies(w, s.cfg.CookieSecure, s.cfg.CookieDomain, bundle)
+		return
+	}
+	setAppSessionCookie(w, s.cfg.CookieSecure, s.cfg.CookieDomain, bundle)
 }
 
 func setAuthCookies(w http.ResponseWriter, secure bool, domain string, bundle *auth.TokenBundle) {

@@ -204,6 +204,7 @@ func TestFlexibleAuth_OTPFlow(t *testing.T) {
 	authCfg := store.AuthConfig{
 		AllowedIdentifiers: []string{"phone"},
 		PrimaryAuthMode:    "otp",
+		PhoneOTPViaWebhook: true,
 	}
 	_ = s.tenants.UpdateAuthConfigAndRegistrationSchema(ctx, tenant.ID, authCfg, nil)
 	client, _ := s.oauthClients.Create(ctx, store.OAuthClientInput{

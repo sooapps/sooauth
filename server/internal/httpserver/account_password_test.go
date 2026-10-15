@@ -20,7 +20,9 @@ import (
 	"github.com/sooapps/sooauth/server/internal/ephemeral"
 	"github.com/sooapps/sooauth/server/internal/fields"
 	"github.com/sooapps/sooauth/server/internal/mail"
+	"github.com/sooapps/sooauth/server/internal/mfa"
 	"github.com/sooapps/sooauth/server/internal/migrate"
+	"github.com/sooapps/sooauth/server/internal/oidc"
 	"github.com/sooapps/sooauth/server/internal/ratelimit"
 	"github.com/sooapps/sooauth/server/internal/store"
 	"github.com/sooapps/sooauth/server/internal/webhooks"
@@ -134,7 +136,19 @@ func setupTestServer(t *testing.T) (*Server, *pgxpool.Pool, *appjwt.Issuer) {
 		webhooks:       webhookDispatcher,
 		webhookStore:   webhookStore,
 		dynamicOptions: dynamicOptions,
+		tenantUsers:    store.NewTenantUsers(db),
+		mfa:            mfa.NewService(store.NewMFA(db, []byte("0123456789abcdef0123456789abcdef"))),
+		oidc: oidc.NewService(
+			cfg.AppURL,
+			store.NewOAuthClients(db),
+			store.NewAuthorizationCodes(db),
+			users,
+			authSvc,
+			jwtIssuer,
+			ratelimit.New(nil),
+		),
 	}
+	s.oidc.SetExtraRedirectURIs(s.testRedirectURIs())
 
 	return s, db, jwtIssuer
 }

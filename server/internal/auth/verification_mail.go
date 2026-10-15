@@ -145,3 +145,17 @@ func (s *Service) SendAppVerificationEmail(ctx context.Context, opts AppVerifica
 		Lang:      opts.Lang,
 	})
 }
+
+// SendSignInCode emails a one-time code through the project's mail settings.
+func (s *Service) SendSignInCode(ctx context.Context, tenantID uuid.UUID, to, brand, code, lang string, mfa bool) error {
+	mailer := s.resolveMailer(ctx, &tenantID)
+	if s.cfg.Env == "production" && mailer == s.mail && !s.cfg.SMTPConfigured() {
+		return fmt.Errorf("%w: SMTP not configured", ErrEmailDelivery)
+	}
+	tx := mail.Transactional{BrandName: brand, AppURL: s.cfg.AppURL, Lang: lang}
+	subject, plainBody, htmlBody := tx.SignInCodeEmail(code, mfa)
+	if err := mailer.SendOutbound(mail.Outbound{To: to, Subject: subject, Plain: plainBody, HTML: htmlBody}); err != nil {
+		return fmt.Errorf("%w: %v", ErrEmailDelivery, err)
+	}
+	return nil
+}
