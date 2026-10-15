@@ -393,6 +393,8 @@ func (s *Server) handleDashboardIntegration(w http.ResponseWriter, r *http.Reque
 		appGoogleCallback := social.CallbackURL(s.cfg.AppURL, "google", dash.tenant, dash.account.Plan, true)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"issuer":                       base,
+			"tenant_id":                    dash.tenant.ID.String(),
+			"test_redirect_uri":            s.testRedirectURIs()[0],
 			"client_id":                    dash.client.ClientID,
 			"redirect_uris":                dash.client.RedirectURIs,
 			"public":                       dash.client.Public,

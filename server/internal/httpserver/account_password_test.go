@@ -148,6 +148,7 @@ func setupTestServer(t *testing.T) (*Server, *pgxpool.Pool, *appjwt.Issuer) {
 			ratelimit.New(nil),
 		),
 	}
+	s.oidc.SetExtraRedirectURIs(s.testRedirectURIs())
 
 	return s, db, jwtIssuer
 }

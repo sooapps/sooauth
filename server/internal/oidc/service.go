@@ -95,6 +95,26 @@ type Service struct {
 	auth      *auth.Service
 	jwt       *appjwt.Issuer
 	limit     *ratelimit.Limiter
+	// extraRedirects are accepted for every client, e.g. the dashboard's
+	// built-in live-test callback.
+	extraRedirects []string
+}
+
+// SetExtraRedirectURIs registers redirect URIs every client may use.
+func (s *Service) SetExtraRedirectURIs(uris []string) {
+	s.extraRedirects = uris
+}
+
+func (s *Service) redirectAllowed(client *store.OAuthClient, uri string) bool {
+	if client.AllowsRedirectURI(uri) {
+		return true
+	}
+	for _, extra := range s.extraRedirects {
+		if uri == extra {
+			return true
+		}
+	}
+	return false
 }
 
 func NewService(
@@ -153,7 +173,7 @@ func (s *Service) Authorize(ctx context.Context, in AuthorizeInput, user *store.
 	if err != nil || client == nil {
 		return nil, ErrUnauthorizedClient
 	}
-	if !client.AllowsRedirectURI(in.RedirectURI) {
+	if !s.redirectAllowed(client, in.RedirectURI) {
 		return nil, ErrInvalidRequest
 	}
 	if !client.AllowsScope(in.Scope) {
@@ -207,7 +227,7 @@ func (s *Service) ExchangeCode(ctx context.Context, in TokenInput, ip string) (*
 	if in.Code == "" || in.RedirectURI == "" || in.CodeVerifier == "" {
 		return nil, ErrInvalidGrant
 	}
-	if !client.AllowsRedirectURI(in.RedirectURI) {
+	if !s.redirectAllowed(client, in.RedirectURI) {
 		return nil, ErrInvalidGrant
 	}
 

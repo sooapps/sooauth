@@ -187,7 +187,24 @@ func New(cfg config.Config, db *pgxpool.Pool, signingKey *signing.Key) (*Server,
 		dynamicOptions: fields.NewDynamicOptionsService(),
 	}
 
+	s.oidc.SetExtraRedirectURIs(s.testRedirectURIs())
 	return s, nil
+}
+
+// testRedirectURIs are the dashboard's live-test callback pages. Every project
+// client accepts them so owners can try sign-in before wiring their own app.
+func (s *Server) testRedirectURIs() []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, origin := range []string{s.cfg.DashboardOrigin, s.cfg.AppURL} {
+		origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+		if origin == "" || seen[origin] {
+			continue
+		}
+		seen[origin] = true
+		out = append(out, origin+"/dashboard/test-callback")
+	}
+	return out
 }
 
 func (s *Server) Router() http.Handler {
@@ -290,6 +307,8 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("GET /dashboard/api/project", s.handleDashboardProject)
 	mux.HandleFunc("PUT /dashboard/api/project", s.handleDashboardProject)
 	mux.HandleFunc("POST /dashboard/api/registration-schema/test-api", s.handleDashboardTestAPI)
+	mux.HandleFunc("GET /dashboard/api/onboarding", s.handleDashboardOnboarding)
+	mux.HandleFunc("PUT /dashboard/api/onboarding", s.handleDashboardOnboarding)
 	mux.HandleFunc("GET /dashboard/api/integration", s.handleDashboardIntegration)
 	mux.HandleFunc("PUT /dashboard/api/integration", s.handleDashboardIntegration)
 	mux.HandleFunc("GET /dashboard/api/users", s.handleDashboardUsers)
