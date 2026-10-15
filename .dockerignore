@@ -9,9 +9,12 @@
 **/.next
 **/node_modules
 **/dist
-admin
-web
-sdks
+# The dashboard (admin/) is built in the Dockerfile's node stage; the other
+# workspaces only contribute their package.json for a frozen pnpm install.
+web/*
+!web/package.json
+sdks/*/*
+!sdks/*/package.json
 docs
 design-system
 *.md
