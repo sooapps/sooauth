@@ -28,6 +28,11 @@ export function AiCustomAuthPromptBlock() {
         model wires custom login/sign-up against sooauth (widget config, password
         policy, email link/code verification, social callback). No embed.js.
       </p>
+      <p className="mt-3 max-w-[58ch] border-l-2 border-accent pl-3 text-[14px] leading-[1.6] text-fg">
+        Signed in? <a href={`${adminUrl}`} className="underline underline-offset-2">Dashboard → Integration → AI setup prompt</a>{" "}
+        gives you this prompt already filled in with your client ID, redirect URLs, sign-in methods and sign-up fields —
+        nothing to edit by hand.
+      </p>
       <pre className="mt-4 max-h-[420px] overflow-auto border border-line bg-bg px-4 py-4 font-mono text-[12px] leading-[1.65] text-fg whitespace-pre-wrap">
         {prompt}
       </pre>

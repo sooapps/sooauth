@@ -1,106 +1,90 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { adminUrl, authUrl, docsIntegrateUrl, signInUrl, signUpUrl } from "../../../lib/site";
+import { adminUrl, authUrl, signUpUrl } from "../../../lib/site";
 
 export const metadata: Metadata = {
   title: "Getting started",
-  description: "Create a Sooauth account and open the dashboard.",
+  description: "From a new account to a working sign-in in your app in about five minutes.",
 };
 
-function Step({
-  n,
-  title,
-  children,
-}: {
-  n: number;
-  title: string;
-  children: ReactNode;
-}) {
+function Step({ n, id, title, children }: { n: number; id?: string; title: string; children: ReactNode }) {
   return (
-    <section className="grid gap-3 border-t border-line py-8 first:border-t-0 first:pt-0">
+    <section id={id} className="grid scroll-mt-24 gap-3 border-t border-line py-8 first:border-t-0 first:pt-0">
       <p className="font-mono text-xs text-fg-muted">Step {n}</p>
       <h2 className="font-sans text-[20px] font-semibold text-fg">{title}</h2>
-      <div className="text-[15px] leading-[1.6] text-fg-muted">{children}</div>
+      <div className="grid gap-3 text-[15px] leading-[1.6] text-fg-muted">{children}</div>
     </section>
   );
 }
 
+const a = "text-fg underline underline-offset-2";
+
 export default function GettingStartedPage() {
   return (
     <article>
-      <h1 className="font-sans text-[32px] font-semibold tracking-tight text-fg">
-        Getting started
-      </h1>
-      <p className="mt-3 max-w-[52ch] text-[16px] leading-[1.6] text-fg-muted">
-        You need a Sooauth account before connecting apps. Auth lives at{" "}
-        <a href={authUrl} className="font-mono text-[14px] text-fg hover:underline">
-          {authUrl.replace("https://", "")}
-        </a>{" "}
-        — separate from this marketing site.
+      <h1 className="font-sans text-[32px] font-semibold tracking-tight text-fg">Getting started</h1>
+      <p className="mt-3 max-w-[60ch] text-[16px] leading-[1.6] text-fg-muted">
+        Create an account, let the setup wizard configure your first project, test the sign-in, then connect
+        your app. Auth lives at{" "}
+        <a href={authUrl} className="font-mono text-[14px] text-fg hover:underline">{authUrl.replace("https://", "")}</a>.
       </p>
 
       <div className="mt-10">
-        <Step n={1} title="Create an account">
+        <Step n={1} title="Create your dashboard account">
           <p>
-            Go to{" "}
-            <a href={signUpUrl} className="text-fg underline-offset-2 hover:underline">
-              sign up
-            </a>
-            . Use a real email — verification is required in production.
+            <a href={signUpUrl} className={a}>Sign up</a> and click the verification link we email you. A first
+            project is created for you.
+          </p>
+          <p>
+            This is your <strong>dashboard</strong> account. Users of your apps get their own accounts per project — even
+            with the same email they are separate. See{" "}
+            <Link href="/docs/users-and-sessions#accounts" className={a}>Users and sessions</Link>.
           </p>
         </Step>
 
-        <Step n={2} title="Verify email">
+        <Step n={2} title="Follow the setup wizard">
+          <p>The <a href={adminUrl} className={a}>dashboard</a> opens a five-step wizard the first time:</p>
+          <ol className="grid list-decimal gap-1.5 pl-5">
+            <li><strong>Project</strong> — name it and pick what you build (Next.js, SPA, backend, custom UI or embed widget).</li>
+            <li><strong>Sign-in methods</strong> — email/username/phone, password or one-time code, optional 2FA. <Link href="/docs/sign-in-methods" className={a}>Details</Link>.</li>
+            <li><strong>Callback URL</strong> — where users return after signing in, e.g. <code className="font-mono text-[13px]">http://localhost:3000/api/auth/callback/oidc</code>.</li>
+            <li><strong>Connect</strong> — an AI prompt and snippet already filled in with your client ID and URLs.</li>
+            <li><strong>Live test</strong> — sign in as a test user and see the token.</li>
+          </ol>
           <p>
-            Check your inbox for the verification link (platform dashboard accounts always use a
-            link). Click it — you should see a success message and a link to sign in.
-          </p>
-          <p className="mt-3 text-fg-muted">
-            App end-users can use link, 6-digit code, or both — configured per project in dashboard → Project. See{" "}
-            <Link href="/docs/custom-auth-ui#verify-code" className="text-fg underline-offset-2 hover:underline">
-              verify code
-            </Link>
-            .
-          </p>
-          <p className="mt-3 text-fg-muted">
-            No email? Confirm SMTP is configured on the auth server (operators only).
+            Closed it? Everything stays under <strong>Getting started</strong> in the sidebar, with a checklist that ticks
+            itself as you go.
           </p>
         </Step>
 
-        <Step n={3} title="Sign in">
+        <Step n={3} id="test" title="Run a live test">
           <p>
-            <a href={signInUrl} className="text-fg underline-offset-2 hover:underline">
-              Sign in
-            </a>{" "}
-            with your email and password. Passkeys and social login appear when
-            enabled in the dashboard.
+            <strong>Integration → Live test</strong> opens your project&apos;s sign-in page in a popup. Sign up or sign in as an
+            end user; the dashboard shows the claims your app will receive (<code className="font-mono text-[13px]">sub</code>,
+            email, custom fields…). It always shows the sign-in screen, so you can try different users.
           </p>
         </Step>
 
-        <Step n={4} title="Open dashboard">
+        <Step n={4} title="Connect your app">
+          <p>Pick the path that matches your stack:</p>
+          <ul className="grid list-disc gap-1.5 pl-5">
+            <li><Link href="/docs/integrate-oidc" className={a}>OIDC with the hosted page</Link> — the least code; works with any OIDC library.</li>
+            <li><Link href="/docs/embed-widget" className={a}>Embed widget</Link> — a drop-in login box on your own page.</li>
+            <li><Link href="/docs/custom-auth-ui" className={a}>Custom auth UI</Link> — your own forms over the sooauth API.</li>
+          </ul>
           <p>
-            After sign-in, open{" "}
-            <a href={adminUrl} className="text-fg underline-offset-2 hover:underline">
-              dashboard
-            </a>
-            . Copy issuer and client ID from Integration, toggle social login,
-            and manage app users.
+            Easiest: open <strong>Integration → AI setup prompt</strong> in the dashboard. The prompt includes your real
+            client ID, URLs, sign-in methods and sign-up fields — paste it into Claude, Cursor or Copilot.
           </p>
         </Step>
 
-        <Step n={5} title="Connect your app">
-          <p>
-            Follow{" "}
-            <Link href="/docs/integrate-oidc" className="text-fg underline-offset-2 hover:underline">
-              Connect your app (OIDC)
-            </Link>
-            {" "}or use the{" "}
-            <a href={`${docsIntegrateUrl}#ai-prompt`} className="text-fg underline-offset-2 hover:underline">
-              AI setup prompt
-            </a>
-            {" "}with Cursor or ChatGPT. Any OIDC-compatible stack works.
-          </p>
+        <Step n={5} title="Go further">
+          <ul className="grid list-disc gap-1.5 pl-5">
+            <li><Link href="/docs/social-login" className={a}>Social login</Link> with Google or GitHub.</li>
+            <li><Link href="/docs/registration-fields" className={a}>Sign-up fields</Link> to collect extra information.</li>
+            <li><Link href="/docs/webhooks" className={a}>Webhooks</Link> to sync users into your database.</li>
+          </ul>
         </Step>
       </div>
     </article>

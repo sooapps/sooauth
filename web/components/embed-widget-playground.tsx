@@ -26,7 +26,10 @@ export function EmbedWidgetPlayground() {
   const [allowEmail, setAllowEmail] = useState(true);
   const [allowUsername, setAllowUsername] = useState(true);
   const [allowPhone, setAllowPhone] = useState(false);
-  const [authMode, setAuthMode] = useState<"password" | "otp">("password");
+  const [authMode, setAuthMode] = useState<"password" | "otp" | "both">("password");
+  // "both": the user picks password or a one-time code on the sign-in screen.
+  const [preferCode, setPreferCode] = useState(false);
+  const effectiveMode: "password" | "otp" = authMode === "both" ? (preferCode ? "otp" : "password") : authMode;
   const [demoCustomFields, setDemoCustomFields] = useState(true);
 
   // Interactive state
@@ -261,7 +264,7 @@ export function EmbedWidgetPlayground() {
             <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted">
               Primary Authentication Mode
             </label>
-            <div className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-field p-1">
+            <div className="grid grid-cols-3 gap-1 rounded-lg border border-line bg-field p-1">
               <button
                 type="button"
                 onClick={() => { setAuthMode("password"); setOtpSent(false); }}
@@ -284,7 +287,23 @@ export function EmbedWidgetPlayground() {
               >
                 Passwordless OTP
               </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMode("both"); setOtpSent(false); setPreferCode(false); }}
+                className={`rounded-md py-1.5 text-xs font-semibold transition active:scale-[0.96] ${
+                  authMode === "both"
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-fg-muted hover:text-fg"
+                }`}
+              >
+                Password or code
+              </button>
             </div>
+            {authMode === "both" && (
+              <p className="text-[11px] leading-[1.5] text-fg-muted">
+                Users choose one on the sign-in screen. For password <em>and</em> code, use two-step verification instead.
+              </p>
+            )}
           </div>
 
           {/* Dynamic Registration Fields Demo (Sign up mode) */}
@@ -380,7 +399,7 @@ export function EmbedWidgetPlayground() {
           </div>
 
           {/* Session & Options */}
-          {authMode === "password" && (
+          {effectiveMode === "password" && (
             <div className="space-y-2">
               <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted">
                 Widget Options
@@ -400,7 +419,7 @@ export function EmbedWidgetPlayground() {
           )}
 
           {/* Password Policy (Sign up mode with password only) */}
-          {mode === "signup" && authMode === "password" && (
+          {mode === "signup" && effectiveMode === "password" && (
             <div className="space-y-3 rounded-xl border border-line bg-field/60 p-4">
               <label className="block text-xs font-bold uppercase tracking-wider text-fg">
                 Password Policy Rules
@@ -509,7 +528,7 @@ export function EmbedWidgetPlayground() {
               </div>
               <p className={`text-xs ${previewTheme === "dark" ? "text-[#9D9E9F]" : "text-[#5D6B70]"}`}>
                 {mode === "signin"
-                  ? authMode === "otp"
+                  ? effectiveMode === "otp"
                     ? "Passwordless sign-in via one-time code"
                     : "Sign in to continue to your account"
                   : "Create an account to get started"}
@@ -569,7 +588,7 @@ export function EmbedWidgetPlayground() {
             <form onSubmit={(e) => e.preventDefault()} className="space-y-3.5">
               {mode === "signin" ? (
                 // --- SIGN IN MODE ---
-                authMode === "otp" ? (
+                effectiveMode === "otp" ? (
                   // OTP Flow
                   !otpSent ? (
                     <div>
@@ -764,7 +783,7 @@ export function EmbedWidgetPlayground() {
                     </div>
                   )}
 
-                  {authMode === "password" && (
+                  {effectiveMode === "password" && (
                     <div>
                       <label className={`block text-xs font-semibold mb-1 ${previewTheme === "dark" ? "text-[#D1D5DB]" : "text-[#374151]"}`}>
                         Password *
@@ -876,6 +895,15 @@ export function EmbedWidgetPlayground() {
                 </>
               )}
             </form>
+            {mode === "signin" && authMode === "both" && (
+              <button
+                type="button"
+                onClick={() => { setPreferCode(!preferCode); setOtpSent(false); }}
+                className="mt-3 w-full text-center text-[11px] underline underline-offset-2 text-fg-muted hover:text-fg"
+              >
+                {preferCode ? "Use my password instead" : "Use a one-time code instead"}
+              </button>
+            )}
 
             {/* Widget Mode Switcher */}
             <div className={`mt-5 pt-4 border-t text-center text-xs ${previewTheme === "dark" ? "border-[#2A2B2E] text-[#9D9E9F]" : "border-[#E5E7EB] text-[#6B7280]"}`}>

@@ -107,34 +107,37 @@ secrets in an application; social provider credentials belong in the dashboard.
 
 ### Passwordless OTP Authentication
 
-For projects with `primary_auth_mode: "otp"`, users can log in or register via one-time numeric verification codes.
+Available when the project's `primary_auth_mode` is `"otp"` (codes only) or `"both"`
+(password or code). In `"password"` mode both endpoints return `403 otp_disabled`;
+in `"otp"` mode `POST /auth/sign-in` returns `403 password_login_disabled`.
 
 #### 1. Send OTP Code
 `POST /auth/otp/send`
 
 ```json
-{
-  "client_id": "app_your_client_id",
-  "identifier": "+905551234567",
-  "channel": "sms"
-}
+{ "client_id": "app_your_client_id", "identifier": "ada@example.com" }
 ```
-* `client_id` *(required)*: Tenant OAuth client ID.
-* `identifier` *(required)*: Email address or phone number to send the code to.
-* `channel` *(optional)*: `"sms"` or `"email"`.
+* `identifier` *(required)*: email, phone or username (must be an enabled identifier).
+  A username's code goes to the account's email/phone; unknown usernames get the same
+  `200` response.
+* Email codes use the project's email settings. Phone codes are only sent when
+  `auth_config.phone_otp_via_webhook` is on: the `otp.sent` webhook payload carries
+  `code` and your server sends the SMS. Otherwise `400 phone_otp_unavailable`.
+* Codes are random 6-digit values valid for 5 minutes. Limits: 5 sends per identifier
+  per 10 minutes, 20 per IP per minute (`429 rate_limited`).
 
 #### 2. Verify OTP Code
 `POST /auth/otp/verify`
 
 ```json
-{
-  "client_id": "app_your_client_id",
-  "identifier": "+905551234567",
-  "code": "482019"
-}
+{ "client_id": "app_your_client_id", "identifier": "ada@example.com", "code": "482019", "metadata": {} }
 ```
 
-On success, returns an authentication bundle (`access_token`, `expires_in`, `email` or user identity). If the user does not exist yet, an account is automatically created and marked verified.
+Success returns `id`, `email`, `access_token`, `refresh_token`, `expires_in`,
+`token_type`. Unknown emails/phones create a verified account. If required
+registration fields are missing: `422 { "error": "registration_required", "fields": [...] }`
+— the code stays valid; retry with `metadata`. Five wrong codes discard the code
+(`429 too_many_attempts`). Add `"hosted": true` only from the hosted sign-in page.
 
 ### Dynamic Field Options Proxy
 
@@ -264,26 +267,34 @@ Header: `Authorization: Bearer <access_token>`
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| POST | `/auth/passkey/register/begin` | Start passkey registration |
+| POST | `/auth/passkey/register/begin` | Start passkey registration (dashboard accounts) |
 | POST | `/auth/passkey/register/finish` | Finish passkey registration |
 | POST | `/auth/passkey/sign-in/begin` | Start passkey sign-in |
 | POST | `/auth/passkey/sign-in/finish` | Finish passkey sign-in |
-| POST | `/auth/mfa/start` | Create TOTP setup data |
-| POST | `/auth/mfa/confirm` | Enable TOTP after code verification |
-| POST | `/auth/mfa/verify` | Complete an MFA login challenge |
-| POST | `/auth/mfa/disable` | Disable MFA with a valid code |
+| POST | `/auth/mfa/start` | Dashboard account: create TOTP setup data |
+| POST | `/auth/mfa/confirm` | Dashboard account: enable TOTP |
+| POST | `/auth/mfa/disable` | Dashboard account: disable TOTP |
+| POST | `/auth/mfa/verify` | Complete an MFA challenge (dashboard and project users) |
+| POST | `/auth/mfa/setup` | Project user: start authenticator enrollment during a `totp_setup` challenge |
+| POST | `/auth/mfa/resend` | Project user: email a 2FA code for the challenge |
+| GET | `/v1/me/mfa` | Project user (Bearer): policy, methods, `totp_enabled` |
+| POST | `/v1/me/mfa/totp/start` | Project user: start authenticator setup |
+| POST | `/v1/me/mfa/totp/confirm` | Project user: enable it `{ code }` → backup codes |
+| POST | `/v1/me/mfa/totp/disable` | Project user: disable it `{ code }` |
 
-When MFA is enabled, password sign-in returns `403` with:
+Project two-step verification is configured with `auth_config.mfa_policy`
+(`off` | `optional` | `required`) and `auth_config.mfa_methods` (`totp`, `email_otp`).
+When a second step is needed, password sign-in returns `401`:
 
 ```json
-{
-  "error": "mfa_required",
-  "challenge": "one-time-challenge-token"
-}
+{ "error": "mfa_required", "challenge": "…", "method": "totp", "methods": ["totp", "email_otp"] }
 ```
 
-The challenge is short-lived and can only be used once. The client submits the
-challenge and an authenticator code or backup code to `/auth/mfa/verify`.
+`method` is `totp`, `email_otp` or `totp_setup`. Submit
+`POST /auth/mfa/verify { "challenge", "code", "method" }`. For `totp_setup`, call
+`/auth/mfa/setup { "challenge" }` first (returns `secret`, `otpauth_url`, `qr_code`);
+the verify response then includes `backup_codes`. Challenges live 5 minutes and are
+single-use.
 
 ## Widget API
 
@@ -292,6 +303,30 @@ challenge and an authenticator code or backup code to `/auth/mfa/verify`.
 | GET | `/v1/widget/config?client_id=...` | Read project auth configuration |
 | POST | `/v1/widget/exchange` | Exchange a social callback code |
 | GET | `/v1/widget/embed.js` | Download the drop-in widget |
+
+`GET /v1/widget/config` returns `auth_config` with `allowed_identifiers`,
+`primary_auth_mode`, `mfa_policy`, `mfa_methods` and `phone_otp_via_webhook`.
+
+## OIDC notes
+
+* `/oauth/authorize` only accepts a session that belongs to the client's project.
+  A signed-in dashboard account is never reused to sign in to a project app.
+* `prompt=login` always shows the sign-in page.
+* Every project client also accepts the dashboard live-test callback
+  (`<dashboard origin>/dashboard/test-callback`).
+
+## Dashboard API additions
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET/PUT | `/dashboard/api/onboarding` | Setup checklist state (`dismissed`, `app_type`, `complete`/`uncomplete` a step) |
+| PUT | `/dashboard/api/project` | Partial update — only the fields sent change; `auth_config` keys merge |
+| DELETE | `/dashboard/api/users/{id}` | Delete a project user (CSRF required); emits `user.deleted` |
+| POST | `/dashboard/api/users/{id}/disable` | Disable and revoke sessions and refresh tokens |
+| POST | `/dashboard/api/users/{id}/mfa/reset` | Remove a user's authenticator |
+| GET | `/dashboard/api/integration` | Now also returns `tenant_id` and `test_redirect_uri` |
+
+All dashboard write requests require the `X-CSRF-Token` header.
 
 ## Tenant Email & Transactional Provider Settings (Admin API)
 

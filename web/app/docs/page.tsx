@@ -12,7 +12,37 @@ const cards = [
   {
     href: "/docs/getting-started",
     title: "Getting started",
-    body: "Create an account, verify email, open the dashboard.",
+    body: "Sign up, follow the setup wizard, run a live test, connect your app.",
+  },
+  {
+    href: "/docs/sign-in-methods",
+    title: "Sign-in methods",
+    body: "Email, username or phone; password, one-time code or both; two-step verification.",
+  },
+  {
+    href: "/docs/otp",
+    title: "One-time codes (OTP)",
+    body: "Passwordless sign-in by email or SMS — delivery, limits, API and new-user flow.",
+  },
+  {
+    href: "/docs/two-factor",
+    title: "Two-step verification",
+    body: "Authenticator app or email code after the password; enrollment and backup codes.",
+  },
+  {
+    href: "/docs/registration-fields",
+    title: "Sign-up fields",
+    body: "Form builder: extra fields, dropdowns from your API, reading custom_claims.",
+  },
+  {
+    href: "/docs/webhooks",
+    title: "Webhooks",
+    body: "Events, payloads and signature verification.",
+  },
+  {
+    href: "/docs/users-and-sessions",
+    title: "Users and sessions",
+    body: "Disable vs delete, sessions, and why dashboard accounts are separate.",
   },
   {
     href: "/docs/integrate-oidc",
