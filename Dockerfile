@@ -5,8 +5,11 @@ FROM node:20-alpine AS admin
 WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Every workspace manifest is needed for a frozen install of the lockfile.
 COPY admin/package.json admin/
-RUN pnpm install --filter @sooauth/admin --frozen-lockfile
+COPY web/package.json web/
+COPY sdks/js/package.json sdks/js/
+RUN pnpm install --filter @sooauth/admin... --frozen-lockfile
 COPY admin/ admin/
 RUN pnpm --filter @sooauth/admin build
 
