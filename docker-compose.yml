@@ -16,7 +16,15 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-sooauth}:${POSTGRES_PASSWORD:-sooauth}@postgres:5432/${POSTGRES_DB:-sooauth}?sslmode=disable
       REDIS_URL: redis://redis:6379/0
       AUTO_MIGRATE: "true"
+      # Required when SOOAUTH_ENV=production: openssl rand -base64 32
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      # Sign-up sends a verification email, so production needs one of these.
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-sooauth@localhost}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       BRAND_NAME: ${BRAND_NAME:-sooauth}
       BRAND_ACCENT: ${BRAND_ACCENT:-#FF3B3B}

@@ -13,6 +13,7 @@
         <span class="brand-title">{{.BrandName}}</span>
       </a>
 
+      {{if not .ClientID}}
       <div class="info-copy">
         <h2 class="info-heading">{{index .T "auth.info_heading"}}</h2>
         <p class="info-desc">{{index .T "auth.info_desc"}}</p>
@@ -24,6 +25,9 @@
           <li><span class="feature-bullet">✦</span> <div><strong>{{index .T "auth.feature_selfhost"}}</strong> — {{index .T "auth.feature_selfhost_desc"}}</div></li>
         </ul>
       </div>
+      {{else}}
+      <div class="info-copy"><h2 class="info-heading">{{.BrandName}}</h2></div>
+      {{end}}
 
       <div class="info-cta">
         <p class="info-cta-label">{{index .T "auth.cta_have_account"}}</p>
@@ -38,8 +42,12 @@
   <div class="auth-form-side sign-in-side standalone">
     <div class="form-inner">
       <div class="form-header">
-        <h1>{{index .T "verify.heading"}}</h1>
-        <p class="card-sub">{{index .T "verify.sub"}}</p>
+        {{if .Error}}
+          <h1>{{index .T "verify.heading"}}</h1>
+          <p class="card-sub">{{index .T "verify.sub"}}</p>
+        {{else}}
+          <h1>{{index .T "verify.done_heading"}}</h1>
+        {{end}}
       </div>
 
       {{if .Error}}
@@ -49,11 +57,7 @@
           <a class="btn secondary" href="/auth/forgot-password{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">{{index .T "forgot.heading"}}</a>
         </div>
       {{else}}
-        {{if .Message}}
-          <p class="message server-feedback">{{.Message}}</p>
-        {{else}}
-          <p class="message server-feedback">{{index .T "verify.success"}}</p>
-        {{end}}
+        <p class="message server-feedback">{{.Message}}</p>
 
         <div style="display:grid;gap:12px;margin-top:22px;">
           {{if .SignInURL}}
@@ -64,9 +68,6 @@
         </div>
       {{end}}
 
-      <div class="links" style="margin-top:22px;">
-        <a href="/auth/sign-in{{if .ClientID}}?client_id={{.ClientID | urlquery}}{{if .ReturnTo}}&amp;return_to={{.ReturnTo | urlquery}}{{end}}{{else if .ReturnTo}}?return_to={{.ReturnTo | urlquery}}{{end}}">{{index .T "forgot.back_sign_in"}}</a>
-      </div>
     </div>
   </div>
 </div>

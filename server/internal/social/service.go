@@ -386,6 +386,12 @@ func ResolveReturnTo(returnTo, appURL string, redirectURIs []string, tenantID *u
 	return resolveReturnTo(returnTo, appURL, redirectURIs, tenantID, clientID)
 }
 
+// AppReturnTo validates an end user's return_to against the project's allowed
+// hosts. Unlike ResolveReturnTo it never falls back to a redirect URI.
+func AppReturnTo(returnTo, appURL string, redirectURIs []string) (string, bool) {
+	return appScopedReturnTo(returnTo, appURL, redirectURIs)
+}
+
 func resolveReturnTo(returnTo, appURL string, redirectURIs []string, tenantID *uuid.UUID, clientID string) (string, bool) {
 	defaultDest := strings.TrimRight(appURL, "/") + "/dashboard/"
 	appScoped := tenantID != nil || strings.TrimSpace(clientID) != ""

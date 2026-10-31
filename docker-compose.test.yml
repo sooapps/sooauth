@@ -1,0 +1,60 @@
+# Disposable end-to-end environment. Same production build as a real deploy,
+# with every email captured by Mailpit.
+#
+#   docker compose -f docker-compose.test.yml -p sooauth-test up -d --build
+#   dashboard  http://localhost:8090/auth/sign-up
+#   inbox      http://localhost:8091
+#   reset      docker compose -f docker-compose.test.yml -p sooauth-test down -v
+services:
+  sooauth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sooauth:test
+    ports:
+      - "8090:8090"
+    environment:
+      PORT: "8090"
+      SOOAUTH_ENV: production
+      APP_URL: http://localhost:8090
+      API_URL: http://localhost:8090
+      DASHBOARD_ORIGIN: http://localhost:8090
+      DATABASE_URL: postgres://sooauth:sooauth@postgres:5432/sooauth?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      AUTO_MIGRATE: "true"
+      # Test-only key; never reuse it anywhere real.
+      MFA_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      SMTP_URL: smtp://mailpit:1025
+      SMTP_FROM: sooauth@localhost.test
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_ORIGIN: http://localhost:8090
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sooauth
+      POSTGRES_PASSWORD: sooauth
+      POSTGRES_DB: sooauth
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sooauth -d sooauth"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "8091:8025"

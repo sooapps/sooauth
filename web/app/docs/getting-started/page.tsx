@@ -33,7 +33,7 @@ export default function GettingStartedPage() {
       <div className="mt-10">
         <Step n={1} title="Create your dashboard account">
           <p>
-            <a href={signUpUrl} className={a}>Sign up</a> and click the verification link we email you. A first
+            <a href={signUpUrl} className={a}>Sign up</a> and click the verification link we email you, then sign in. A first
             project is created for you.
           </p>
           <p>
@@ -53,15 +53,15 @@ export default function GettingStartedPage() {
             <li><strong>Live test</strong> — sign in as a test user and see the token.</li>
           </ol>
           <p>
-            Closed it? Everything stays under <strong>Getting started</strong> in the sidebar, with a checklist that ticks
-            itself as you go.
+            Closed it? Open your project and choose <strong>Getting started</strong>; the checklist ticks itself as you go.
           </p>
         </Step>
 
         <Step n={3} id="test" title="Run a live test">
           <p>
-            <strong>Integration → Live test</strong> opens your project&apos;s sign-in page in a popup. Sign up or sign in as an
-            end user; the dashboard shows the claims your app will receive (<code className="font-mono text-[13px]">sub</code>,
+            <strong>Live test</strong> in your project&apos;s menu opens the sign-in page in a popup. Sign up or sign in as an
+            end user. If you verify by email, open the link from your inbox; the sign-in continues there and the dashboard
+            updates by itself. It shows the claims your app will receive (<code className="font-mono text-[13px]">sub</code>,
             email, custom fields…). It always shows the sign-in screen, so you can try different users.
           </p>
         </Step>
@@ -74,7 +74,11 @@ export default function GettingStartedPage() {
             <li><Link href="/docs/custom-auth-ui" className={a}>Custom auth UI</Link> — your own forms over the sooauth API.</li>
           </ul>
           <p>
-            Easiest: open <strong>Integration → AI setup prompt</strong> in the dashboard. The prompt includes your real
+            Not in the dashboard yet? The <Link href="/docs/integrate-oidc#ai-prompt" className={a}>AI prompt builder</Link> asks
+            about your stack and design, then writes the prompt for you.
+          </p>
+          <p>
+            Easiest: open <strong>AI setup prompt</strong> in your project. The prompt includes your real
             client ID, URLs, sign-in methods and sign-up fields — paste it into Claude, Cursor or Copilot.
           </p>
         </Step>

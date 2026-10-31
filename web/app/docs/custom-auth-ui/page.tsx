@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AiCustomAuthPromptBlock } from "../../../components/ai-custom-auth-prompt";
+import { AiPromptBuilder } from "../../../components/ai-prompt-builder";
 import { adminUrl, authUrl } from "../../../lib/site";
 
 export const metadata: Metadata = {
@@ -37,7 +37,7 @@ export default function CustomAuthUiPage() {
         .
       </p>
 
-      <AiCustomAuthPromptBlock />
+      <AiPromptBuilder initialDesign="own" />
 
       <section className="mt-10">
         <h2 className="font-sans text-[22px] font-semibold text-fg">
@@ -45,7 +45,7 @@ export default function CustomAuthUiPage() {
         </h2>
         <ol className="mt-4 grid gap-3 text-[15px] leading-[1.6] text-fg-muted">
           <li>1. Copy <span className="font-mono text-[13px]">client_id</span> and redirect URIs from{" "}
-            <a href={adminUrl} className="text-fg underline-offset-2 hover:underline">dashboard → Integration</a></li>
+            <a href={adminUrl} className="text-fg underline-offset-2 hover:underline">your project → Keys &amp; URLs</a></li>
           <li>2. On sign-in / sign-up page load → fetch widget config</li>
           <li>3. Render social buttons from <span className="font-mono text-[13px]">providers</span>; build password checklist from <span className="font-mono text-[13px]">password_policy</span></li>
           <li>4. POST email auth to <span className="font-mono text-[13px]">/auth/sign-in</span> or <span className="font-mono text-[13px]">/auth/sign-up</span> with <span className="font-mono text-[13px]">client_id</span></li>
@@ -81,7 +81,7 @@ export default function CustomAuthUiPage() {
   }
 }`}</pre>
         <p className="mt-4 text-[15px] leading-[1.6] text-fg-muted">
-          CORS is enabled. In production, proxy through your backend with{" "}
+          CORS is enabled on every endpoint on this page. In production, proxy through your backend with{" "}
           <span className="font-mono text-[13px]">cache: no-store</span> so policy
           changes apply immediately.
         </p>
@@ -92,7 +92,7 @@ export default function CustomAuthUiPage() {
           2. Password policy UI (sign-up)
         </h2>
         <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
-          Rules are set in dashboard → <strong className="font-medium text-fg">Project settings</strong>.
+          Rules are set in your project → <strong className="font-medium text-fg">Passwords &amp; verification</strong>.
           Build a live checklist from <span className="font-mono text-[13px]">password_policy</span>:
         </p>
         <ul className="mt-4 grid gap-2 text-[15px] text-fg-muted">
@@ -123,15 +123,16 @@ Content-Type: application/json
 { "email": "user@example.com", "password": "…", "client_id": "app_your_client_id" }
 
 // Success (app user — not dashboard)
-{ "access_token": "…", "email": "…", "expires_in": 3600 }`}</pre>
+{ "access_token": "…", "refresh_token": "…", "email": "…", "expires_in": 900 }`}</pre>
         <p className="mt-4 text-[15px] leading-[1.6] text-fg-muted">
           With <span className="font-mono text-[13px]">client_id</span>, users are app
           end-users linked to your project — not sooauth dashboard accounts. Optional{" "}
           <span className="font-mono text-[13px]">return_to</span> sets where email
-          verification sends the user after they confirm (must match a redirect URI host;
-          otherwise the first <span className="font-mono text-[13px]">/login</span> URI is used).
+          verification sends the user after they confirm. It must match a redirect URI host; otherwise
+          the first <span className="font-mono text-[13px]">/login</span> URI is used, and without one the user sees a
+          confirmation page on sooauth. OIDC callback URLs are never used as a default.
           Verification emails use your project name as the brand. Delivery mode is set in
-          dashboard → Project: <span className="font-mono text-[13px]">link</span>,{" "}
+          your project → Passwords &amp; verification: <span className="font-mono text-[13px]">link</span>,{" "}
           <span className="font-mono text-[13px]">code</span>, or{" "}
           <span className="font-mono text-[13px]">both</span> (see{" "}
           <span className="font-mono text-[13px]">email_verify_delivery</span> in widget config).
@@ -164,7 +165,7 @@ Content-Type: application/json
 { "email": "user@example.com", "code": "123456", "client_id": "app_your_client_id" }
 
 // Success — verifies email and returns an app session
-{ "message": "Email verified. You are signed in.", "access_token": "…", "email": "…", "expires_in": 3600 }`}</pre>
+{ "message": "Email verified. You are signed in.", "access_token": "…", "email": "…", "expires_in": 900 }`}</pre>
         <p className="mt-4 text-[15px] leading-[1.6] text-fg-muted">
           Show a code input on your check-email screen when{" "}
           <span className="font-mono text-[13px]">email_verify_delivery</span> is{" "}
@@ -196,7 +197,7 @@ POST ${issuer}/v1/widget/exchange
         <p className="mt-4 text-[15px] leading-[1.6] text-fg-muted">
           Register <span className="font-mono text-[13px]">return_to</span> host in
           dashboard redirect URIs. Custom Google OAuth (your brand on consent screen)
-          is configured in dashboard → Social login.
+          is configured in your project → Social login.
         </p>
       </section>
 

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function SocialLoginPage() {
   return (
     <article>
-      <DocTitle lead={<>Turn on Google or GitHub in <DashboardPath>Authentication → Social login</DashboardPath>. Social buttons then appear on the hosted page and in the widget. Your app never stores Google or GitHub secrets.</>}>
+      <DocTitle lead={<>Turn on Google or GitHub in <DashboardPath>Social login</DashboardPath>. Social buttons then appear on the hosted page and in the widget. Your app never stores Google or GitHub secrets.</>}>
         Social login
       </DocTitle>
 
@@ -36,7 +36,7 @@ POST ${authUrl}/v1/widget/exchange
 { "code": "<widget_code>", "client_id": "app_123" }
 → { "access_token": "…", "email": "…", "expires_in": 900 }`}</Code>
       <List>
-        <li>The <C>return_to</C> page must be one of the project&apos;s redirect URIs (<DashboardPath>Integration → Keys &amp; URLs</DashboardPath>).</li>
+        <li>The <C>return_to</C> page must be one of the project&apos;s redirect URIs (<DashboardPath>Keys &amp; URLs</DashboardPath>).</li>
         <li>With OIDC (hosted page) you don&apos;t need any of this — the buttons are already on the sign-in page.</li>
         <li>If a user already has a password account in this project with the same email, their first Google/GitHub sign-in is linked to that account.</li>
       </List>

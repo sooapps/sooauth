@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 export type Route =
   | { kind: "project"; projectId: string; section: string }
+  | { kind: "home" }
+  | { kind: "account"; section: string }
   | { kind: "test-callback" }
   | { kind: "root"; legacyHash: string };
 
@@ -15,6 +17,8 @@ export function parseRoute(pathname = location.pathname, hash = location.hash): 
   const rest = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
   const parts = rest.split("/").filter(Boolean);
   if (parts[0] === "test-callback") return { kind: "test-callback" };
+  if (parts[0] === "home") return { kind: "home" };
+  if (parts[0] === "account") return { kind: "account", section: parts[1] || "billing" };
   if (parts[0] === "p" && parts[1]) {
     return { kind: "project", projectId: parts[1], section: parts[2] || "" };
   }
@@ -23,6 +27,12 @@ export function parseRoute(pathname = location.pathname, hash = location.hash): 
 
 export function projectPath(projectId: string, section: string) {
   return `${BASE}/p/${projectId}/${section}`;
+}
+
+export const homePath = `${BASE}/home`;
+
+export function accountPath(section: string) {
+  return `${BASE}/account/${section}`;
 }
 
 const listeners = new Set<() => void>();
@@ -60,7 +70,6 @@ export const legacySections: Record<string, string> = {
   sessions: "sessions",
   theme: "theme",
   email: "email",
-  billing: "billing",
   audit: "audit",
   webhooks: "webhooks",
 };

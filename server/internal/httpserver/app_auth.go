@@ -338,7 +338,7 @@ func (s *Server) handleWidgetConfig(w http.ResponseWriter, r *http.Request) {
 		"logo_url":               theme.LogoURL,
 		"accent_color":           theme.AccentColor,
 		"show_powered_by":        plan == "free" || !theme.HideBranding,
-		"providers":              providers,
+		"providers":              append([]string{}, providers...),
 		"email_password_enabled": true,
 		"remember_me_enabled":    true,
 		"remember_me_default":    true,

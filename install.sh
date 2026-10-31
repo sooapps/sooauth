@@ -89,6 +89,8 @@ AUTO_MIGRATE=true
 MFA_ENCRYPTION_KEY=${MFA_KEY}
 ADMIN_EMAILS=
 WEBAUTHN_RP_ID=localhost
+# Sign-up emails a verification link, so set this before creating an account.
+# SMTP_URL=smtp://user:password@smtp.example.com:587
 EOF
   echo -e "${GREEN}✓${NC} Generated .env with random cryptographic secrets."
 else
@@ -107,9 +109,13 @@ echo -e "${GREEN}  Sooauth is up and running!                        ${NC}"
 echo -e "${GREEN}====================================================${NC}"
 echo ""
 echo -e "  ${CYAN}Sign-in & Sign-up:${NC}    http://localhost:8080/auth/sign-in"
-echo -e "  ${CYAN}Admin Panel:${NC}          http://localhost:8080/admin/"
+echo -e "  ${CYAN}Dashboard:${NC}            http://localhost:8080/dashboard/"
 echo -e "  ${CYAN}OIDC Discovery:${NC}       http://localhost:8080/.well-known/openid-configuration"
 echo ""
+if ! grep -qE '^(SMTP_URL|SMTP_HOST)=.+' .env; then
+  echo -e "${YELLOW}!${NC} No SMTP configured: sign-up will fail until you set SMTP_URL in .env and run '$DOCKER_COMPOSE_CMD up -d'."
+  echo ""
+fi
 echo -e "To view logs:"
 echo -e "  ${YELLOW}$DOCKER_COMPOSE_CMD logs -f sooauth${NC}"
 echo ""

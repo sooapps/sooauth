@@ -19,6 +19,7 @@ export type AppState = {
   go: (section: string) => void;
   onboarding: Onboarding | null;
   refreshOnboarding: () => Promise<void>;
+  refreshMe: () => Promise<void>;
   openWizard: () => void;
 };
 
@@ -29,6 +30,7 @@ export const AppContext = createContext<AppState>({
   go: () => undefined,
   onboarding: null,
   refreshOnboarding: async () => undefined,
+  refreshMe: async () => undefined,
   openWizard: () => undefined,
 });
 

@@ -40,7 +40,7 @@ export default function EmbedWidgetPage() {
           Quick start
         </h2>
         <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
-          Copy from dashboard → Integration, or paste this (replace{" "}
+          Copy from your project → Keys &amp; URLs, or paste this (replace{" "}
           <span className="font-mono text-[13px]">app_…</span> with your client ID):
         </p>
         <pre className="mt-4 overflow-x-auto border border-line bg-bg-subtle px-4 py-3 font-mono text-[13px] leading-[1.7] text-fg">{`<div id="sooauth-widget"></div>
@@ -90,7 +90,7 @@ export default function EmbedWidgetPage() {
               <tr>
                 <td className="py-3 pr-4 font-mono text-[13px] text-fg">data-client-id</td>
                 <td className="py-3 pr-4">Yes</td>
-                <td className="py-3">Public OAuth client ID from dashboard → Integration</td>
+                <td className="py-3">Public OAuth client ID from your project → Keys &amp; URLs</td>
               </tr>
               <tr>
                 <td className="py-3 pr-4 font-mono text-[13px] text-fg">data-mode</td>
@@ -122,7 +122,7 @@ export default function EmbedWidgetPage() {
           Password requirements (sign-up)
         </h2>
         <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
-          Rules come from dashboard → <strong className="font-medium text-fg">Project settings</strong>{" "}
+          Rules come from your project → <strong className="font-medium text-fg">Passwords &amp; verification</strong>{" "}
           (min length, uppercase, number, special). The widget reads them from{" "}
           <span className="font-mono text-[13px]">GET /v1/widget/config</span>.
         </p>
@@ -161,7 +161,7 @@ export default function EmbedWidgetPage() {
         <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
           embed.js uses the <strong className="font-medium text-fg">link</strong> flow only
           (user clicks the button in the email). For 6-digit codes or link+code, set{" "}
-          <span className="font-mono text-[13px]">email_verify_delivery</span> in dashboard → Project
+          <span className="font-mono text-[13px]">email_verify_delivery</span> in your project → Passwords &amp; verification
           and build a check-email screen with{" "}
           <Link href="/docs/custom-auth-ui#verify-code" className="text-fg underline-offset-2 hover:underline">
             Custom auth UI
@@ -193,7 +193,7 @@ export default function EmbedWidgetPage() {
           Custom Registration Fields &amp; Dynamic API Options
         </h2>
         <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
-          Define custom registration fields in dashboard → <strong className="font-medium text-fg">Registration &amp; Fields</strong>. In sign-up mode, <span className="font-mono text-[13px]">embed.js</span> dynamically renders:
+          Define custom registration fields in your project → <strong className="font-medium text-fg">Registration &amp; Fields</strong>. In sign-up mode, <span className="font-mono text-[13px]">embed.js</span> dynamically renders:
         </p>
         <ul className="mt-4 grid gap-2 text-[15px] text-fg-muted">
           <li>

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function RegistrationFieldsPage() {
   return (
     <article>
-      <DocTitle lead={<>Ask for more than an email and password when users sign up — a company name, a role, a team picked from your own API. Build the form in <DashboardPath>Authentication → Sign-up fields</DashboardPath>.</>}>
+      <DocTitle lead={<>Ask for more than an email and password when users sign up — a company name, a role, a team picked from your own API. Build the form in <DashboardPath>Sign-up fields</DashboardPath>.</>}>
         Sign-up fields
       </DocTitle>
 

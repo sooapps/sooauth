@@ -14,6 +14,9 @@ export default function AdminDocsPage() {
         Dashboard
       </DocTitle>
 
+      <H2 id="navigation">Finding your way around</H2>
+      <P>The dashboard home lists your projects and recent activity. Open a project and the sidebar switches to that project&apos;s pages; the arrow at the top goes back. The first item in the breadcrumb switches project and keeps the page you are on. Press <C>⌘K</C> or <C>Ctrl K</C> to jump to any page.</P>
+
       <H2 id="start">Getting started</H2>
       <P>A checklist that ticks itself as you configure the project, and the setup wizard. The wizard opens automatically for a new project. See <DocLink href="/docs/getting-started">Getting started</DocLink>.</P>
 
@@ -55,7 +58,7 @@ export default function AdminDocsPage() {
       </P>
 
       <H2 id="project">Project</H2>
-      <P><strong>Project settings</strong> holds the name and default language of hosted pages and emails. <strong>Billing</strong> shows your plan and limits.</P>
+      <P><strong>Project settings</strong> holds the name and default language of hosted pages and emails. <strong>Billing</strong> lives under Account on the dashboard home, because your plan covers every project.</P>
 
       <H2 id="self-hosted">Self-hosted</H2>
       <P>The Docker image serves the same dashboard at <C>/dashboard/</C>. Building from source: run <C>pnpm --filter @sooauth/admin build:embed</C> before <C>go build</C>. See <DocLink href="/docs/self-host">Self-host Sooauth</DocLink>.</P>

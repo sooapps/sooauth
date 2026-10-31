@@ -87,7 +87,7 @@ docker compose up -d
 
 Your services are live:
 - **Sign-in / Sign-up:** `http://localhost:8080/auth/sign-in`
-- **Admin Panel:** `http://localhost:8080/admin/`
+- **Dashboard:** `http://localhost:8080/dashboard/`
 - **OIDC Discovery:** `http://localhost:8080/.well-known/openid-configuration`
 
 ---
