@@ -6,14 +6,21 @@ export function csrf() {
   return decodeURIComponent(document.cookie.match(/(?:^|; )sooauth_csrf=([^;]+)/)?.[1] || "");
 }
 
+// The URL decides the project, so each tab stays on its own one.
+function projectFromUrl() {
+  return location.pathname.match(/^\/dashboard\/p\/([^/]+)/)?.[1] || "";
+}
+
 export async function request(path: string, options: RequestInit = {}) {
   const method = (options.method || "GET").toString().toUpperCase();
   const headers = new Headers(options.headers);
+  const project = projectFromUrl();
+  if (project) headers.set("X-Sooauth-Project", project);
   if (method !== "GET") {
     headers.set("Content-Type", "application/json");
     headers.set("X-CSRF-Token", csrf());
   }
-  const response = await fetch(`${API}/dashboard/api${path}`, { ...options, headers, credentials: "include" });
+  const response = await fetch(`${API}/dashboard/api${path}`, { ...options, headers, credentials: "include", cache: "no-store" });
   const body = await response.json().catch(() => ({}));
   if (response.status === 401) {
     const back = encodeURIComponent(location.pathname + location.search);

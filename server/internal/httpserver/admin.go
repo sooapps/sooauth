@@ -27,6 +27,10 @@ import (
 
 const projectCookie = "sooauth_project"
 
+// projectHeader carries the project of the dashboard URL. It beats the cookie,
+// which is shared between tabs and can exist twice (host-only and domain-wide).
+const projectHeader = "X-Sooauth-Project"
+
 type dashboardCtx struct {
 	user    *store.User
 	account *store.Account
@@ -84,9 +88,23 @@ func (s *Server) loadDashboardProject(r *http.Request, account *store.Account) (
 	return &tenant, client, err
 }
 
+// projectCandidates lists the requested project ids, strongest first.
+func projectCandidates(r *http.Request) []string {
+	out := []string{}
+	if v := strings.TrimSpace(r.Header.Get(projectHeader)); v != "" {
+		out = append(out, v)
+	}
+	for _, c := range r.CookiesNamed(projectCookie) {
+		if c.Value != "" {
+			out = append(out, c.Value)
+		}
+	}
+	return out
+}
+
 func (s *Server) activeTenant(r *http.Request, accountID uuid.UUID) *store.Tenant {
-	if c, err := r.Cookie(projectCookie); err == nil && c.Value != "" {
-		if id, err := uuid.Parse(c.Value); err == nil {
+	for _, candidate := range projectCandidates(r) {
+		if id, err := uuid.Parse(candidate); err == nil {
 			if t, err := s.tenants.FindByIDForAccount(r.Context(), id, accountID); err == nil && t != nil {
 				return t
 			}
@@ -100,6 +118,10 @@ func (s *Server) activeTenant(r *http.Request, accountID uuid.UUID) *store.Tenan
 }
 
 func (s *Server) setActiveProject(w http.ResponseWriter, tenantID uuid.UUID) {
+	if s.cfg.CookieDomain != "" {
+		// Drop any host-only copy so it cannot shadow the domain-wide cookie.
+		http.SetCookie(w, &http.Cookie{Name: projectCookie, Path: "/", MaxAge: -1})
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     projectCookie,
 		Value:    tenantID.String(),

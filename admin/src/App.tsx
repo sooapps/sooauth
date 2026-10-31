@@ -172,17 +172,30 @@ export function App() {
         return;
       }
       setSwitching(true);
-      post(`/projects/${route.projectId}/select`)
+      const target = route.projectId;
+      const section = route.section || "overview";
+      // Whatever happens, leave the URL on a project we can show: a mismatch
+      // here would re-run this effect forever.
+      post(`/projects/${target}/select`)
         .then(() => request("/me"))
-        .then(setMe)
-        .catch((e) => notify((e as Error).message))
+        .then((fresh: Data) => {
+          setMe(fresh);
+          if (fresh.project?.id !== target) {
+            notify(tr("project.switchFailed"));
+            navigate(projectPath(fresh.project?.id, section), { replace: true });
+          }
+        })
+        .catch((e) => {
+          notify((e as Error).message);
+          navigate(projectPath(activeId, section), { replace: true });
+        })
         .finally(() => setSwitching(false));
       return;
     }
     if (!findSection(route.section)) {
       navigate(projectPath(activeId, "overview"), { replace: true });
     }
-  }, [me, route, activeId, isCallback, notify]);
+  }, [me, route, activeId, isCallback, notify, tr]);
 
   const inProject = route.kind === "project";
   useEffect(() => {
