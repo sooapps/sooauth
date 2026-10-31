@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function WebhooksPage() {
   return (
     <article>
-      <DocTitle lead={<>Add an endpoint in <DashboardPath>Integration → Webhooks</DashboardPath> and pick events. sooauth POSTs JSON to your URL and signs every request.</>}>Webhooks</DocTitle>
+      <DocTitle lead={<>Add an endpoint in <DashboardPath>Webhooks</DashboardPath> and pick events. sooauth POSTs JSON to your URL and signs every request.</>}>Webhooks</DocTitle>
 
       <H2 id="events">Events</H2>
       <Table

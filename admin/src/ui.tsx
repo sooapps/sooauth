@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useApp, useI18n } from "./context";
 
 export const DOCS_URL = "https://sooauth.com/docs";
@@ -131,13 +132,21 @@ export function PageIntro({ text, docs }: { text: string; docs?: string }) {
 
 export function Modal({ title, onClose, children, footer, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeRef.current(); };
     document.addEventListener("keydown", onKey);
-    ref.current?.querySelector<HTMLElement>("input, select, textarea, button")?.focus();
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
+  }, []);
+  // Focus once when opening; callers pass a new onClose on every render.
+  useEffect(() => {
+    const root = ref.current;
+    (root?.querySelector<HTMLElement>("input, select, textarea") || root?.querySelector<HTMLElement>("button"))?.focus();
+  }, []);
+  // Portalled so a modal opened from the dark sidebar keeps the page's theme
+  // and is not clipped by the sidebar's mobile transform.
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={`modal ${wide ? "wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="modal-head">
@@ -147,7 +156,8 @@ export function Modal({ title, onClose, children, footer, wide }: { title: strin
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

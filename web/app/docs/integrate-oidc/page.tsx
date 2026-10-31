@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AiSetupPromptBlock } from "../../../components/ai-setup-prompt";
+import { AiPromptBuilder } from "../../../components/ai-prompt-builder";
 import { adminUrl, authUrl, oidcDiscoveryUrl } from "../../../lib/site";
 
 export const metadata: Metadata = {
@@ -21,7 +21,7 @@ export default function IntegrateOidcPage() {
         Auth0 or Google. Works with any stack: Next.js, Go, mobile, SPA.
       </p>
 
-      <AiSetupPromptBlock />
+      <AiPromptBuilder initialDesign="hosted" />
 
       <section className="mt-10 border border-line p-6">
         <h2 className="font-sans text-[18px] font-semibold text-fg">
@@ -40,7 +40,7 @@ export default function IntegrateOidcPage() {
         <p className="mt-3 text-[15px] leading-[1.6] text-fg-muted">
           In{" "}
           <a href={adminUrl} className="text-fg hover:underline">
-            dashboard → Integration
+            your project → Keys &amp; URLs
           </a>
           , each project has:
         </p>
@@ -65,9 +65,9 @@ AUTH_OIDC_REDIRECT_URI=https://yourapp.com/api/auth/callback/oidc`}</pre>
         <p className="mt-4 text-[15px] leading-[1.6] text-fg-muted">
           Add the same redirect URI in dashboard before testing. For custom auth UI (email/social),
           also register your app&apos;s <span className="font-mono text-[13px]">/login</span> and{" "}
-          <span className="font-mono text-[13px]">/register</span> URLs — used for email verification
+          <span className="font-mono text-[13px]">/register</span> URLs — used for the email verification
           return and social <span className="font-mono text-[13px]">return_to</span>, not only the OIDC
-          callback. Social login (Google, GitHub, etc.) is configured in dashboard → Social login
+          callback. Social login (Google, GitHub, etc.) is configured in your project → Social login
           only — never in your app&apos;s env.
         </p>
       </section>
@@ -80,9 +80,13 @@ AUTH_OIDC_REDIRECT_URI=https://yourapp.com/api/auth/callback/oidc`}</pre>
           <li>1. App sends user to <span className="font-mono text-[13px]">/oauth/authorize</span> with <span className="font-mono text-[13px]">client_id</span>, <span className="font-mono text-[13px]">redirect_uri</span>, <span className="font-mono text-[13px]">code_challenge</span> (PKCE)</li>
           <li>2. User signs in on hosted pages if needed</li>
           <li>3. Browser returns to your callback with <span className="font-mono text-[13px]">code</span></li>
-          <li>4. Backend POSTs to <span className="font-mono text-[13px]">/oauth/token</span> with code + verifier</li>
+          <li>4. Your server, or the browser in a single-page app, POSTs to <span className="font-mono text-[13px]">/oauth/token</span> with code + verifier. The endpoint allows cross-origin requests</li>
           <li>5. Use access token on <span className="font-mono text-[13px]">/oauth/userinfo</span> or validate JWT via JWKS</li>
         </ol>
+        <p className="mt-4 text-[15px] leading-[1.6] text-fg-muted">
+          New users verify their email during step 2. The link in the email brings them back to the same sign-in, so
+          your callback only ever sees a real <span className="font-mono text-[13px]">code</span>.
+        </p>
       </section>
 
       <section className="mt-10 border border-line bg-bg-subtle p-6">

@@ -30,8 +30,15 @@ export function LiveTest({ compact }: { compact?: boolean }) {
       setResult(e.data.result);
       if (e.data.result?.ok) refreshOnboarding();
     };
+    // A test user who verifies by email finishes in a new tab, without an opener.
+    const channel = new BroadcastChannel(TEST_MESSAGE);
+    const onChannel = (e: MessageEvent) => onMessage(new MessageEvent("message", { origin: location.origin, data: e.data }));
+    channel.addEventListener("message", onChannel);
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    return () => {
+      channel.close();
+      window.removeEventListener("message", onMessage);
+    };
   }, [refreshOnboarding]);
 
   if (!integration) return <Loading />;

@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState, type ReactElement } from "re
 import { post, request, type Data, type Onboarding } from "./api";
 import { AppContext, I18nContext } from "./context";
 import { getStoredLang, setStoredLang, t, type Lang, type TranslateFn } from "./i18n";
+import { CommandPalette } from "./layout/CommandPalette";
 import { Sidebar } from "./layout/Sidebar";
+import { Topbar } from "./layout/Topbar";
 import type { AppTheme } from "./layout/ProfileMenu";
-import { findSection, groupOf } from "./nav";
-import { legacySections, navigate, projectPath, useRoute } from "./router";
+import { findAccountSection, findSection } from "./nav";
+import { accountPath, homePath, legacySections, navigate, projectPath, useRoute } from "./router";
 import { Loading, PageIntro } from "./ui";
+import Home from "./pages/Home";
 import Overview from "./pages/Overview";
 import GettingStarted from "./pages/start/GettingStarted";
 import Wizard from "./pages/start/Wizard";
@@ -27,6 +30,7 @@ import EmailDelivery from "./pages/branding/EmailDelivery";
 import ProjectSettings from "./pages/project/ProjectSettings";
 import Billing from "./pages/project/Billing";
 import "./styles.css";
+import "./shell.css";
 
 const pages: Record<string, () => ReactElement> = {
   start: GettingStarted,
@@ -47,6 +51,21 @@ const pages: Record<string, () => ReactElement> = {
   settings: ProjectSettings,
   billing: Billing,
 };
+
+function useCollapsed() {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("admin-sidebar") === "rail";
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () => {
+    setCollapsed(!collapsed);
+    try { localStorage.setItem("admin-sidebar", collapsed ? "full" : "rail"); } catch { /* ignore */ }
+  };
+  return [collapsed, toggle] as const;
+}
 
 function useTheme() {
   const [theme, setTheme] = useState<AppTheme>(() => {
@@ -86,6 +105,8 @@ export function App() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [collapsed, toggleCollapsed] = useCollapsed();
 
   const notify = useCallback((message: string) => {
     setNotice(message);
@@ -104,6 +125,21 @@ export function App() {
     request("/me").then(setMe).catch((e) => notify((e as Error).message));
   }, [isCallback, notify]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const refreshMe = useCallback(async () => {
+    setMe(await request("/me"));
+  }, []);
+
   const activeId: string = me?.project?.id || "";
   const refreshOnboarding = useCallback(async () => {
     try {
@@ -120,10 +156,16 @@ export function App() {
     const projects: Data[] = me.projects || [];
     if (route.kind === "root") {
       const legacy = legacySections[route.legacyHash];
-      navigate(projectPath(activeId, legacy || "overview"), { replace: true });
+      if (route.legacyHash === "billing") navigate(accountPath("billing"), { replace: true });
+      else if (legacy || projects.length === 1) navigate(projectPath(activeId, legacy || "overview"), { replace: true });
+      else navigate(homePath, { replace: true });
       return;
     }
     if (route.kind !== "project") return;
+    if (route.section === "billing") {
+      navigate(accountPath("billing"), { replace: true });
+      return;
+    }
     if (route.projectId !== activeId) {
       if (!projects.some((p) => p.id === route.projectId)) {
         navigate(projectPath(activeId, route.section || "overview"), { replace: true });
@@ -142,8 +184,9 @@ export function App() {
     }
   }, [me, route, activeId, isCallback, notify]);
 
+  const inProject = route.kind === "project";
   useEffect(() => {
-    if (!activeId) return;
+    if (!activeId || !inProject) return;
     request("/onboarding")
       .then((state: Onboarding) => {
         setOnboarding(state);
@@ -152,7 +195,7 @@ export function App() {
         if (!state.dismissed && state.done_count === 0) setWizardOpen(true);
       })
       .catch(() => undefined);
-  }, [activeId]);
+  }, [activeId, inProject]);
 
   const go = useCallback((section: string) => {
     if (activeId) navigate(projectPath(activeId, section));
@@ -162,48 +205,43 @@ export function App() {
     return <I18nContext.Provider value={{ lang, tr, setLang: changeLang }}><TestCallback /></I18nContext.Provider>;
   }
 
-  const section = route.kind === "project" ? route.section : "";
-  const meta = findSection(section);
-  const ready = me && route.kind === "project" && route.projectId === activeId && meta && !switching;
+  const meta = route.kind === "project" ? findSection(route.section) : route.kind === "account" ? findAccountSection(route.section) : undefined;
+  const ready = me && !switching && (route.kind === "home" || (meta && (route.kind === "account" || (route.kind === "project" && route.projectId === activeId))));
   const Page = meta ? pages[meta.id] : undefined;
+  const title = meta ? tr(meta.labelKey) : "";
 
   return (
     <I18nContext.Provider value={{ lang, tr, setLang: changeLang }}>
-      <AppContext.Provider value={{ me, projectId: activeId, notify, go, onboarding, refreshOnboarding, openWizard: () => setWizardOpen(true) }}>
-        <div className="app">
+      <AppContext.Provider value={{ me, projectId: activeId, notify, go, onboarding, refreshOnboarding, refreshMe, openWizard: () => setWizardOpen(true) }}>
+        <div className={`app ${collapsed ? "rail" : ""}`}>
           <Sidebar
             me={me}
-            section={section}
+            route={route}
             onboarding={onboarding}
             theme={theme}
             onThemeChange={changeTheme}
-            onSwitchProject={(id) => navigate(projectPath(id, section || "overview"))}
             open={menuOpen}
+            collapsed={collapsed}
+            onToggleCollapsed={toggleCollapsed}
             onNavigate={() => setMenuOpen(false)}
+            onOpenSearch={() => { setMenuOpen(false); setSearchOpen(true); }}
           />
+          {menuOpen && <button type="button" className="nav-scrim" aria-label={tr("common.close")} onClick={() => setMenuOpen(false)} />}
           <main>
-            <header className="topbar">
-              <button type="button" className="menu-toggle" aria-label={tr("sidebar.menu")} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>☰</button>
-              <div>
-                <p className="eyebrow">{meta && groupOf(meta.id) ? tr(groupOf(meta.id)) : me?.project?.name || ""}</p>
-                <h1>{meta ? tr(meta.labelKey) : ""}{me?.project?.name && meta && groupOf(meta.id) ? <span> · {me.project.name}</span> : null}</h1>
-              </div>
-              <div className="lang-switch" role="group" aria-label={tr("common.language")}>
-                <button type="button" className={lang === "en" ? "active" : ""} onClick={() => changeLang("en")}>EN</button>
-                <button type="button" className={lang === "tr" ? "active" : ""} onClick={() => changeLang("tr")}>TR</button>
-              </div>
-            </header>
+            <Topbar me={me} route={route} title={title} menuOpen={menuOpen} onToggleMenu={() => setMenuOpen(!menuOpen)} />
             {notice && <div className="toast" role="status">{notice}</div>}
             <div className="content">
-              {ready && meta && Page ? (
+              {!ready ? <Loading /> : route.kind === "home" ? <Home /> : meta && Page ? (
                 <div key={`${activeId}:${meta.id}`}>
+                  <h1 className="page-title">{title}</h1>
                   <PageIntro text={tr(meta.introKey)} docs={meta.docs} />
                   <Page />
                 </div>
               ) : <Loading />}
             </div>
           </main>
-          {wizardOpen && ready && <Wizard onClose={() => setWizardOpen(false)} />}
+          {wizardOpen && ready && inProject && <Wizard onClose={() => setWizardOpen(false)} />}
+          {searchOpen && <CommandPalette me={me} onClose={() => setSearchOpen(false)} />}
         </div>
       </AppContext.Provider>
     </I18nContext.Provider>

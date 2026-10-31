@@ -39,6 +39,9 @@ export default function TestCallback() {
       .then((r) => {
         setResult(r);
         history.replaceState(null, "", location.pathname);
+        const channel = new BroadcastChannel(TEST_MESSAGE);
+        channel.postMessage({ type: TEST_MESSAGE, result: r });
+        channel.close();
         if (window.opener) {
           window.opener.postMessage({ type: TEST_MESSAGE, result: r }, location.origin);
           if (r.ok) setTimeout(() => window.close(), 1200);

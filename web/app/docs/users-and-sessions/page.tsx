@@ -30,7 +30,7 @@ export default function UsersAndSessionsPage() {
 
       <H2 id="sessions">Sessions</H2>
       <P>
-        <DashboardPath>Users → Sessions</DashboardPath> lists signed-in sessions of this project&apos;s users. Revoking one signs that device out at its next request. Your own dashboard sessions are not listed here; manage them in the Security Center.
+        <DashboardPath>Sessions</DashboardPath> lists signed-in sessions of this project&apos;s users. Revoking one signs that device out at its next request. Your own dashboard sessions are not listed here; manage them in the Security Center.
       </P>
       <List>
         <li>Refresh tokens rotate on every use; reusing an old one revokes the whole family.</li>

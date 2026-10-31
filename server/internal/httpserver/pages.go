@@ -193,11 +193,13 @@ func (s *Server) handlePageVerifyEmail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if appReturnTo != "" {
+	if appReturnTo != "" && !strings.HasPrefix(appReturnTo, "/") {
 		data.SignInURL = appReturnTo
 	}
 
-	if token != "" {
+	if token == "" {
+		data.Error = friendlyPageError(data.Lang, "invalid_token")
+	} else {
 		already, err := s.auth.VerifyEmail(r.Context(), token, clientIP(r))
 		if err != nil {
 			data.Error = friendlyPageError(data.Lang, "invalid_token")
@@ -206,6 +208,12 @@ func (s *Server) handlePageVerifyEmail(w http.ResponseWriter, r *http.Request) {
 				data.Message = i18n.T(data.Lang, "verify.already")
 			} else {
 				data.Message = i18n.T(data.Lang, "verify.success")
+			}
+			if strings.HasPrefix(appReturnTo, "/") {
+				// A hosted sign-in was in progress: finish it on the sign-in page.
+				q := url.Values{"client_id": {clientID}, "return_to": {appReturnTo}, "message": {data.Message}}
+				http.Redirect(w, r, "/auth/sign-in?"+q.Encode(), http.StatusFound)
+				return
 			}
 			if appReturnTo != "" {
 				dest, _ := appendEmailVerifiedQuery(appReturnTo)

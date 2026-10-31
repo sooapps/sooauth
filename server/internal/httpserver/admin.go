@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -153,6 +154,51 @@ func (s *Server) handleDashboardMe(w http.ResponseWriter, r *http.Request) {
 			"email_verify_required": dash.tenant.EmailVerifyRequired,
 		},
 		"integration": integration,
+	})
+}
+
+// handleDashboardHome powers the account-wide landing page: every project with
+// its size, plus the latest activity across all of them.
+func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
+	dash, ok := s.requireDashboard(w, r)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	projects, err := s.tenants.ListByAccount(ctx, dash.account.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "list_failed"})
+		return
+	}
+
+	type activity struct {
+		Action    string `json:"action"`
+		Project   string `json:"project"`
+		ProjectID string `json:"project_id"`
+		CreatedAt string `json:"created_at"`
+	}
+	projectList := make([]map[string]any, 0, len(projects))
+	recent := []activity{}
+	for _, p := range projects {
+		signals, _ := s.tenants.OnboardingSignals(ctx, p.ID)
+		item := map[string]any{"id": p.ID, "name": p.Name, "users": signals.EndUsers, "providers": signals.Providers, "client_id": ""}
+		if client, _ := s.oauthClients.FindPrimaryByTenant(ctx, p.ID); client != nil {
+			item["client_id"] = client.ClientID
+		}
+		projectList = append(projectList, item)
+		entries, _ := s.audit.ListByTenant(ctx, p.ID, dash.user.ID, 8)
+		for _, e := range entries {
+			recent = append(recent, activity{Action: e.Action, Project: p.Name, ProjectID: p.ID.String(), CreatedAt: e.CreatedAt.Format(time.RFC3339)})
+		}
+	}
+	sort.SliceStable(recent, func(i, j int) bool { return recent[i].CreatedAt > recent[j].CreatedAt })
+	if len(recent) > 8 {
+		recent = recent[:8]
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"projects":     projectList,
+		"recent":       recent,
+		"max_projects": billing.MaxProjects(dash.account.Plan),
 	})
 }
 

@@ -14,7 +14,7 @@ const steps = ["project", "sign_in", "redirect", "integrate", "test"] as const;
 // where to send them back, how to integrate, and a live test.
 export default function Wizard({ onClose }: { onClose: () => void }) {
   const { tr } = useI18n();
-  const { notify, onboarding, refreshOnboarding } = useApp();
+  const { notify, onboarding, refreshOnboarding, refreshMe, go } = useApp();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [appType, setAppType] = useState<AppType>((onboarding?.app_type as AppType) || "nextjs");
@@ -49,11 +49,13 @@ export default function Wizard({ onClose }: { onClose: () => void }) {
       if (id === "project") {
         await put("/project", { name });
         await mark("project", { app_type: appType });
+        await refreshMe();
       } else if (id === "sign_in" && auth) {
         await put("/project", { auth_config: auth });
         await mark("sign_in");
       } else if (id === "redirect" && uris) {
-        const clean = uris.map((u) => u.trim()).filter(Boolean);
+        // The suggestion is shown in the field, so an untouched field means it.
+        const clean = (uris.length ? uris : [defaultCallback[appType]]).map((u) => u.trim()).filter(Boolean);
         if (!clean.length) {
           notify(tr("wizard.redirect.required"));
           return;
@@ -66,6 +68,7 @@ export default function Wizard({ onClose }: { onClose: () => void }) {
       await refreshOnboarding();
       if (step === steps.length - 1) {
         await close();
+        go("start");
         return;
       }
       setStep(step + 1);

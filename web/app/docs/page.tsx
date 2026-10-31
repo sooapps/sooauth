@@ -55,19 +55,14 @@ const cards = [
     body: "Your own login/sign-up — widget config, password policy, email link/code verify, AI prompt.",
   },
   {
-    href: "/docs/custom-auth-ui#ai-prompt",
-    title: "AI prompt (custom UI)",
-    body: "Copy-paste for Cursor / ChatGPT to wire custom auth against sooauth APIs.",
-  },
-  {
     href: "/docs/embed-widget",
     title: "Embed widget",
     body: "Drop-in embed.js — sign-in/sign-up script, password rules, sooauth:login event.",
   },
   {
     href: "/docs/integrate-oidc#ai-prompt",
-    title: "AI setup prompt",
-    body: "Copy-paste prompt for Cursor / ChatGPT to wire OIDC into your codebase.",
+    title: "AI prompt builder",
+    body: "Pick your stack, design and color; copy a prompt for Claude, Cursor or Copilot.",
   },
   {
     href: "/docs/admin",

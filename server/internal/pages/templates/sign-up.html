@@ -13,6 +13,7 @@
         <span class="brand-title">{{.BrandName}}</span>
       </a>
 
+      {{if not .ClientID}}
       <div class="info-copy">
         <h2 class="info-heading" id="info-heading">{{index .T "auth.info_heading"}}</h2>
         <p class="info-desc" id="info-desc">{{index .T "auth.info_desc"}}</p>
@@ -24,6 +25,9 @@
           <li><span class="feature-bullet">✦</span> <div><strong>{{index .T "auth.feature_selfhost"}}</strong> — {{index .T "auth.feature_selfhost_desc"}}</div></li>
         </ul>
       </div>
+      {{else}}
+      <div class="info-copy"><h2 class="info-heading">{{.BrandName}}</h2></div>
+      {{end}}
 
       <div class="info-cta">
         <p class="info-cta-label" id="info-cta-label">{{index .T "auth.cta_have_account"}}</p>
@@ -91,7 +95,7 @@
     <div class="form-inner">
       <div class="form-header">
         <h1>{{index .T "auth.create_account"}}</h1>
-        <p class="card-sub">{{index .T "auth.sign_up_sub"}}</p>
+        {{if not .ClientID}}<p class="card-sub">{{index .T "auth.sign_up_sub"}}</p>{{end}}
       </div>
 
       {{if .Error}}<p class="error server-feedback">{{.Error}}</p>{{end}}

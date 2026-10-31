@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function TwoFactorPage() {
   return (
     <article>
-      <DocTitle lead={<>Two-step verification asks for a second code after a correct password. Configure it in <DashboardPath>Authentication → Sign-in methods → Two-step verification</DashboardPath>.</>}>
+      <DocTitle lead={<>Two-step verification asks for a second code after a correct password. Configure it in <DashboardPath>Sign-in methods → Two-step verification</DashboardPath>.</>}>
         Two-step verification (2FA)
       </DocTitle>
 
@@ -78,7 +78,7 @@ POST ${authUrl}/v1/me/mfa/totp/start      → { "secret", "otpauth_url", "qr_cod
 POST ${authUrl}/v1/me/mfa/totp/confirm    { "code" } → { "enabled": true, "backup_codes": [...] }
 POST ${authUrl}/v1/me/mfa/totp/disable    { "code" } → { "enabled": false }`}</Code>
       <List>
-        <li>Lost phone? The project owner can press <DashboardPath>Users → Reset 2FA</DashboardPath>. If 2FA is required the user sets it up again on the next sign-in.</li>
+        <li>Lost phone? The project owner can press <DashboardPath>Reset 2FA</DashboardPath>. If 2FA is required the user sets it up again on the next sign-in.</li>
         <li>The hosted sign-in page and the embed widget already show all of these screens.</li>
       </List>
     </article>

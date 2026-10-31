@@ -42,12 +42,14 @@
     {{.Body}}
     {{if not .HideFooter}}<footer class="auth-foot">
       <div class="foot-links">
+        {{if not .ClientID}}
         <a href="/dashboard/">{{index .T "layout.dashboard"}}</a>
         <span aria-hidden="true">·</span>
         <a href="https://sooauth.com/docs">{{index .T "layout.docs"}}</a>
         <span aria-hidden="true">·</span>
         <a href="https://sooauth.com/docs/integrate-oidc#ai-prompt">{{index .T "layout.ai_prompt"}}</a>
         <span aria-hidden="true">·</span>
+        {{end}}
         <a href="https://sooapps.com" target="_blank" rel="noopener">{{index .T "layout.sooapps"}}</a>
       </div>
       <button type="button" class="theme-toggle-btn" id="theme-toggle" aria-label="{{index .T "layout.theme_toggle"}}" title="{{index .T "layout.theme_toggle"}}">

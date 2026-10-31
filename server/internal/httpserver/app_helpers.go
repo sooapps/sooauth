@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/sooapps/sooauth/server/internal/social"
@@ -20,18 +21,35 @@ func appDisplayBrand(tenant *store.Tenant, theme store.Theme, client *store.OAut
 	return "your app"
 }
 
+// resolveAppReturnTo picks where an end user lands after an email link. An
+// explicit return_to wins when it is allowed; a hosted sign-in in progress
+// (/oauth/authorize on this server) is kept so the OIDC flow can continue.
 func resolveAppReturnTo(returnTo, appURL string, client *store.OAuthClient) string {
 	if client == nil {
 		return ""
 	}
-	if strings.TrimSpace(returnTo) != "" {
-		if dest, ok := social.ResolveReturnTo(returnTo, appURL, client.RedirectURIs, client.TenantID, client.ClientID); ok && dest != "" {
-			return dest
-		}
+	returnTo = strings.TrimSpace(returnTo)
+	if isAuthorizeReturnTo(returnTo, client) {
+		return returnTo
+	}
+	if dest, ok := social.AppReturnTo(returnTo, appURL, client.RedirectURIs); ok {
+		return dest
 	}
 	return defaultAppReturnTo(client.RedirectURIs)
 }
 
+// isAuthorizeReturnTo reports whether returnTo is a local /oauth/authorize URL
+// for this client.
+func isAuthorizeReturnTo(returnTo string, client *store.OAuthClient) bool {
+	if !strings.HasPrefix(returnTo, "/oauth/authorize?") {
+		return false
+	}
+	u, err := url.Parse(returnTo)
+	return err == nil && u.Query().Get("client_id") == client.ClientID
+}
+
+// defaultAppReturnTo only returns a page that can greet a returning user. OIDC
+// callbacks are skipped: without a code they can only show an error.
 func defaultAppReturnTo(redirectURIs []string) string {
 	lower := func(u string) string { return strings.ToLower(u) }
 	for _, uri := range redirectURIs {
@@ -43,9 +61,6 @@ func defaultAppReturnTo(redirectURIs []string) string {
 		if strings.Contains(lower(uri), "/register") {
 			return uri
 		}
-	}
-	if len(redirectURIs) > 0 {
-		return redirectURIs[0]
 	}
 	return ""
 }

@@ -12,6 +12,7 @@ import (
 )
 
 func (s *Server) handleOpenIDConfiguration(w http.ResponseWriter, r *http.Request) {
+	setPublicCORS(w, r)
 	writeJSON(w, http.StatusOK, s.oidc.Discovery())
 }
 
@@ -74,6 +75,7 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
+	setPublicCORS(w, r)
 	access := bearerToken(r)
 	if access == "" {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_token"})
@@ -95,6 +97,7 @@ func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
+	setPublicCORS(w, r)
 	if err := r.ParseForm(); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_form"})
 		return
@@ -194,6 +197,7 @@ func writeTokenResponse(w http.ResponseWriter, result *oidc.TokenResult) {
 }
 
 func (s *Server) handleJWKS(w http.ResponseWriter, r *http.Request) {
+	setPublicCORS(w, r)
 	jwks, err := signing.JWKSFromDB(r.Context(), s.db)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "jwks_unavailable"})

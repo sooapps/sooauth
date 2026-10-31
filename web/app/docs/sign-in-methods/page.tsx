@@ -57,7 +57,7 @@ export default function SignInMethodsPage() {
 
       <H2 id="password-and-verification">Passwords and email verification</H2>
       <P>
-        In <DashboardPath>Authentication → Passwords &amp; verification</DashboardPath> set the minimum length and character rules, and whether new users must verify their email (by link, 6-digit code or both) before signing in. Users who sign in with a one-time code are verified automatically.
+        In <DashboardPath>Passwords &amp; verification</DashboardPath> set the minimum length and character rules, and whether new users must verify their email (by link, 6-digit code or both) before signing in. Users who sign in with a one-time code are verified automatically.
       </P>
 
       <H2 id="config-api">Reading the settings from your app</H2>

@@ -43,22 +43,25 @@ export default function SelfHostDocsPage() {
           <ul className="grid gap-2">
             <li>· Docker + Docker Compose</li>
             <li>· VPS with ~1 GB RAM free</li>
-            <li>· SMTP for production email</li>
+            <li>· SMTP: sign-up needs it, because production refuses to create accounts it cannot email</li>
             <li>· A domain (e.g. auth.yourcompany.com)</li>
           </ul>
         </Step>
 
         <Step n={2} title="Deploy stack">
           <p>Use the monorepo compose file:</p>
-          <pre className="mt-4 overflow-x-auto border border-line bg-bg-subtle px-4 py-3 font-mono text-[13px] leading-[1.7] text-fg">{`git clone https://github.com/sooapps/sooauth
+          <pre className="mt-4 overflow-x-auto border border-line bg-bg-subtle px-4 py-3 font-mono text-[13px] leading-[1.7] text-fg">{`git clone https://github.com/sooapps/sooauth && cd sooauth
 cp .env.coolify.example .env
-# set POSTGRES_PASSWORD, SMTP_URL, APP_URL, ADMIN_EMAILS
+# In .env set APP_URL, POSTGRES_PASSWORD and your SMTP settings.
+# MFA_ENCRYPTION_KEY is required; the server will not start without it:
+#   openssl rand -base64 32
 docker compose -f docker-compose.coolify.yml up -d`}</pre>
         </Step>
 
         <Step n={3} title="Domain & TLS">
           <p>
-            Point your auth subdomain to the server. Coolify/Traefik or Caddy
+            This compose file publishes no port, because Coolify or your proxy reaches the
+            container on the Docker network at port 8080. Point your auth subdomain to the server. Coolify/Traefik or Caddy
             terminates TLS. Set <span className="font-mono text-[13px]">APP_URL</span> to
             your public HTTPS origin.
           </p>

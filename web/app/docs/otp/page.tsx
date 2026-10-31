@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function OtpPage() {
   return (
     <article>
-      <DocTitle lead={<>Let users sign in with a 6-digit code instead of a password. Turn it on in <DashboardPath>Authentication → Sign-in methods</DashboardPath> by choosing <C>otp</C> (codes only) or <C>both</C> (password or code).</>}>
+      <DocTitle lead={<>Let users sign in with a 6-digit code instead of a password. Turn it on in <DashboardPath>Sign-in methods</DashboardPath> by choosing <C>otp</C> (codes only) or <C>both</C> (password or code).</>}>
         One-time codes (OTP)
       </DocTitle>
 
@@ -27,7 +27,7 @@ export default function OtpPage() {
       <Table
         head={["Identifier", "How the code is sent"]}
         rows={[
-          ["Email", <>Through the project&apos;s email settings (<DashboardPath>Branding → Email</DashboardPath>), or sooauth&apos;s mail server if you haven&apos;t set one up.</>],
+          ["Email", <>Through the project&apos;s email settings (<DashboardPath>Email</DashboardPath>), or sooauth&apos;s mail server if you haven&apos;t set one up.</>],
           ["Phone", <>sooauth does not send SMS itself. Enable <DashboardPath>“Send phone codes through my webhook”</DashboardPath> and add a webhook for <C>otp.sent</C>; the payload includes the code and your server sends the SMS. See <DocLink href="/docs/webhooks#otp-sent">otp.sent</DocLink>.</>],
           ["Username", "A username has no inbox. The code goes to the account's email (or phone). Unknown usernames get the same response, so usernames cannot be probed."],
         ]}
