@@ -6,6 +6,7 @@ export const enExtra: Record<string, string> = {
   "common.readDocs": "Read the docs",
   "common.typeToConfirm": "Type {text} to confirm",
 
+  "project.switchFailed": "Could not open that project.",
   "nav.dashboard": "Dashboard",
   "nav.projects": "Projects",
   "nav.manage": "Manage",
@@ -284,6 +285,7 @@ export const trExtra: Record<string, string> = {
   "common.readDocs": "Dokümana git",
   "common.typeToConfirm": "Onaylamak için {text} yazın",
 
+  "project.switchFailed": "Bu proje açılamadı.",
   "nav.dashboard": "Panel",
   "nav.projects": "Projeler",
   "nav.manage": "Yönetim",
